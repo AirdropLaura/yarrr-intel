@@ -1,0 +1,18 @@
+[Unit]
+Description=Yarrr.Intel FastAPI backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/yarrr-intel
+Environment="PYTHONPATH=/opt/yarrr-intel"
+Environment="ALLOWED_ORIGIN=https://yarrr-node.com"
+ExecStart=/opt/yarrr-intel/backend/.venv/bin/uvicorn backend.app:app --host 127.0.0.1 --port 8421 --workers 1 --log-level info
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/yarrr-intel.log
+StandardError=append:/var/log/yarrr-intel.err.log
+
+[Install]
+WantedBy=multi-user.target

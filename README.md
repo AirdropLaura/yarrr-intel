@@ -1,10 +1,11 @@
-# Yarrr.Tech
+# Yarrr.Intel
 
-> AI co-pilot for Web3 testnet operators, node runners, and airdrop builders.
+> Paste any wallet. Instantly understand what it actually does.
 
-Paste any Web3 ops failure — node panic, tx revert, RPC timeout, faucet error,
-MetaMask popup hang, Docker port conflict, dependency mismatch, smart contract
-revert. Get the root cause and exact fix commands.
+AI Wallet Intelligence — feed any EVM address, and Yarrr.Intel reads its
+on-chain history across 5 chains and tells you what the wallet *is*: airdrop
+hunter, smart-money DeFi user, dormant whale, NFT trader, MEV bot. Not just
+balances. Not another portfolio tracker.
 
 Powered by [Xiaomi MiMo](https://platform.xiaomimimo.com/) V2.5.
 
@@ -12,37 +13,53 @@ Powered by [Xiaomi MiMo](https://platform.xiaomimimo.com/) V2.5.
 
 ## Why
 
-Web3 ops is mostly debugging. Whether you're running a validator at 3am, hunting
-airdrops across ten testnets, or wiring up a Foundry script, you spend more
-time staring at cryptic errors than building.
+Block explorers show you data. They don't tell you what it means. Looking at
+Etherscan, you see hashes, gas, timestamps. You don't see *who this wallet is*.
 
-Most of those errors have known fixes — the knowledge is just scattered across
-Discord threads, GitHub issues, forum posts, and outdated docs. Yarrr.Tech
-turns one paste-bin into a focused diagnostic tool: one prompt, one root cause,
-one set of commands to try. No hunting through 47 tabs.
+Yarrr.Intel does the interpretation. We compress 250 transactions across 5
+chains into a 500-token digest, then ask MiMo V2.5 to write the kind of
+summary a senior on-chain analyst would write — concise, evidence-based,
+free of bro-hype.
 
-## What it troubleshoots
+## Sample output (vitalik.eth)
 
-- **Node & validator logs** — Cosmos SDK, CometBFT, Tendermint, Substrate, EVM clients
-- **RPC errors** — eth_call failures, JSON-RPC malformed, rate limits, 429/502/504
-- **Failed testnet transactions** — reverts, nonce mismatch, gas estimation, replacement underpriced
-- **MetaMask & wallet automation** — Playwright/Puppeteer popup races, chain id, user-rejected
-- **Faucets** — rate limits, captcha, IP bans, drip queues, eligibility checks
-- **Bridges / swaps / mints** — LayerZero, Wormhole, Hop, Uniswap, NFT mint reverts, allowance issues
-- **Docker / systemd / Linux services** — restart loops, port conflicts, OOMKilled, permission denied
-- **npm / pnpm / yarn / Python** — peer-dep conflicts, module not found, resolver failures
-- **Smart contracts** — decoded revert reasons, ABI mismatches, Foundry/Hardhat, Solidity compiler
-- **Airdrop workflows** — eligibility, claim transactions, proof generation, signature mismatch
+```
+TL;DR
+Sophisticated multi-chain DeFi operator actively engaging protocols across
+all five major EVM chains, with concentrated Uniswap V3 liquidity activity
+on Base and heavy contract-level interactions on Ethereum and L2s.
 
-Node ops is the strongest single use case, but the product is broader by design.
+Behavior tags
+multi_chain · defi_user · smart_money · lp_provider · high_activity · governance_voter
+
+Notable findings
+- Repeated targeting of unverified contract 0xe67362…e25f across 3 L2s — likely a single protocol or aggregator the wallet uses heavily
+- Base DEX activity is exclusively Uniswap V3, suggesting deliberate LP positioning rather than opportunistic swaps
+- Near-zero direct transfers (1 of 250 tx) — capital flows entirely through contracts
+```
+
+## What the report covers
+
+- **TL;DR** — one vivid sentence on what the wallet is
+- **Behavioral profile** — what kind of operator runs this wallet
+- **Behavior tags** — `airdrop_hunter`, `smart_money`, `dormant`, `bridge_user`, etc.
+- **Chain footprint** — primary hub vs. peripheral chains
+- **Notable findings** — recent unusual moves, dormant→active shifts, suspicious patterns
+- **Risks & approvals** — high error rates, repeated reverts, unverified counterparties
+- **Bottom line** — one paragraph you could send to a friend
 
 ## Stack
 
-- **Frontend** — Next.js 14 (App Router), Tailwind, shadcn-style components, dark + gold elegant theme
-- **Backend** — FastAPI (Python 3.11), streaming SSE, MiMo client wrapper
-- **Inference** — Xiaomi MiMo V2.5 (`mimo-v2.5` for reasoning, `mimo-v2-flash` for quick suggestions)
-- **Deployment** — Single VPS (Ubuntu 24.04) + nginx + Let's Encrypt + systemd
-- **Domain** — `yarrr-node.com`
+- **Frontend** — Next.js 14, Tailwind, dark + gold elegant theme, streaming SSE
+- **Backend** — FastAPI (Python 3.11), in-memory cache (5-min TTL)
+- **On-chain data** — Etherscan V2 (Ethereum, Polygon, Arbitrum) + Blockscout (Base, Optimism)
+- **Inference** — Xiaomi MiMo V2.5
+- **Deployment** — single VPS, nginx, Let's Encrypt, systemd
+
+## Privacy
+
+We never store wallet addresses, queries, or analysis output. The only
+persistence is a 5-minute in-memory cache to deduplicate concurrent requests.
 
 ## Status
 
