@@ -5,21 +5,81 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 const PRESET_NETWORKS = [
-  'Cosmos SDK',
-  'CometBFT / Tendermint',
+  // Categories
+  'Cosmos SDK / CometBFT',
+  'EVM (geth / erigon / reth)',
   'Substrate',
-  'EVM (geth/erigon)',
+  'Foundry / Hardhat',
+  'MetaMask / Playwright',
+  'Docker / systemd',
+  'npm / pnpm / yarn',
+  'Python / pip',
+  // Networks the user often interacts with
   'nesa-node',
   'tempo-node',
   'inri-installer',
   'Other',
 ];
 
-const PLACEHOLDER = `Paste your error log, panic trace, RPC response, or config snippet here.
+const EXAMPLES: { label: string; category: string; text: string }[] = [
+  {
+    label: 'Node panic',
+    category: 'node',
+    text: `nesa-node[12345]: 2026-05-15 19:42:11 ERROR: failed to connect to peer: dial tcp 35.x.x.x:26656: i/o timeout
+nesa-node[12345]: 2026-05-15 19:42:14 ERROR: consensus state not initialized
+nesa-node[12345]: 2026-05-15 19:42:14 panic: runtime error: invalid memory address or nil pointer dereference`,
+  },
+  {
+    label: 'Tx revert',
+    category: 'tx',
+    text: `Error: cannot estimate gas; transaction may fail or may require manual gas limit
+   reason: execution reverted: ERC20: transfer amount exceeds allowance
+   method: claim(uint256,bytes32[])
+   from: 0x85B395f1...0957
+   to: 0x000000000022D473030F116dDEE9F6B43aC78BA3 (Permit2)
+   value: 0`,
+  },
+  {
+    label: 'Mint revert',
+    category: 'mint',
+    text: `Error: execution reverted (unknown custom error)
+selector: 0x82b42900   // SaleNotActive()
+chain: Base Sepolia
+contract: 0x4f...e91 (PixelPunk NFT)
+caller: 0x85B395f1...0957
+attempted call: mint(uint256 quantity = 1) value = 0.001 ETH`,
+  },
+  {
+    label: 'Faucet stuck',
+    category: 'faucet',
+    text: `POST https://faucet.example.io/api/claim
+{"error":"rate_limit_exceeded","detail":"Address 0x85B3... has claimed within the last 24h. Try again in 19h 22m."}
 
-Example:
-nesa-node[12345]: 2026-05-15 ERROR: failed to connect to peer
-nesa-node[12345]: panic: runtime error: invalid memory address or nil pointer dereference`;
+Note: I switched IP via VPN but the cooldown is still being applied.`,
+  },
+  {
+    label: 'MetaMask popup',
+    category: 'wallet',
+    text: `playwright._impl._errors.TimeoutError: locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('button:has-text("Confirm")')
+  - locator resolved to <button data-testid="page-container-footer-next">…</button>
+  - element is not visible
+URL: chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/popup.html
+Action: signing eth_sendTransaction on Base Sepolia`,
+  },
+  {
+    label: 'Docker',
+    category: 'docker',
+    text: `nesa-validator | Error response from daemon: driver failed programming external connectivity on endpoint nesa-validator
+nesa-validator | (a3b…ed4): Bind for 0.0.0.0:26656 failed: port is already allocated
+docker compose up: exit status 1`,
+  },
+];
+
+const PLACEHOLDER = `Paste any failure: panic trace, revert reason, RPC error, faucet response, MetaMask timeout, Docker log, dependency conflict, smart contract error...
+
+Don't worry about formatting. We read messy paste fine.`;
 
 export default function Home() {
   const [text, setText] = useState('');
@@ -30,6 +90,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<{ total_tokens?: number; reasoning_tokens?: number; latency_seconds?: number } | null>(null);
+
+  function loadExample(idx: number) {
+    setText(EXAMPLES[idx].text);
+    setOutput('');
+    setError(null);
+  }
 
   async function diagnose() {
     if (!text.trim()) return;
@@ -85,7 +151,7 @@ export default function Home() {
           </div>
           <div>
             <h1 className="font-bold tracking-tight">Yarrr<span className="text-gold-400">.</span>Tech</h1>
-            <p className="text-xs text-ink-400 font-mono">v0.1 · powered by MiMo V2.5</p>
+            <p className="text-xs text-ink-400 font-mono">v0.2 · powered by MiMo V2.5</p>
           </div>
         </div>
         <a href="https://github.com/AirdropLaura/yarrr-tech" target="_blank" rel="noreferrer" className="btn-ghost">
@@ -94,23 +160,57 @@ export default function Home() {
         </a>
       </header>
 
-      <section className="relative max-w-3xl mx-auto px-6 pt-8 pb-12 text-center">
+      <section className="relative max-w-3xl mx-auto px-6 pt-8 pb-10 text-center">
         <span className="inline-block px-3 py-1 text-[11px] font-mono font-semibold uppercase tracking-wider text-gold-400 border border-gold-400/30 rounded-full bg-gold-400/5">
           Free during beta
         </span>
         <h2 className="mt-5 text-4xl sm:text-5xl font-bold leading-tight tracking-tight bg-gradient-to-br from-ink-50 to-gold-400 bg-clip-text text-transparent">
-          Diagnose node failures<br className="hidden sm:block" /> in seconds, not hours.
+          AI co-pilot for<br className="hidden sm:block" /> Web3 operators.
         </h2>
         <p className="mt-4 text-ink-300 max-w-xl mx-auto">
-          Paste a panic trace, peer timeout, or broken config. Get the root cause and the exact commands to fix it.
+          Testnet runners, validators, and airdrop builders — paste any failure and get the root cause and exact fix.
         </p>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-mono text-ink-400">
+          {[
+            'node logs',
+            'RPC errors',
+            'tx reverts',
+            'MetaMask',
+            'faucets',
+            'bridge / swap / mint',
+            'Docker',
+            'npm / pip',
+            'smart contracts',
+            'airdrop flows',
+          ].map((t) => (
+            <span key={t} className="px-2 py-0.5 rounded-full bg-ink-800/60 border border-ink-700/60">
+              {t}
+            </span>
+          ))}
+        </div>
       </section>
 
       <section className="relative max-w-3xl mx-auto px-6">
         <div className="glass rounded-2xl p-6 sm:p-7 shadow-2xl shadow-gold-400/5">
-          <label className="block text-xs font-mono uppercase tracking-wider text-ink-400 mb-2">
-            Log / error / config
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-xs font-mono uppercase tracking-wider text-ink-400">
+              Failure / log / error
+            </label>
+            <div className="flex gap-1.5 text-[11px] font-mono text-ink-400">
+              <span className="hidden sm:inline mr-1 text-ink-500">try:</span>
+              {EXAMPLES.map((ex, i) => (
+                <button
+                  key={ex.label}
+                  type="button"
+                  onClick={() => loadExample(i)}
+                  className="px-2 py-0.5 rounded-full bg-ink-800/60 border border-ink-700/60 hover:border-gold-400/40 hover:text-gold-400 transition-colors"
+                >
+                  {ex.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <textarea
             className="input-base font-mono text-sm leading-relaxed p-4 resize-y min-h-[200px]"
             placeholder={PLACEHOLDER}
@@ -122,12 +222,12 @@ export default function Home() {
           <div className="mt-4 grid sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-mono uppercase tracking-wider text-ink-400 mb-1.5">
-                Network <span className="text-ink-500">(optional)</span>
+                Stack / network <span className="text-ink-500">(optional)</span>
               </label>
               <input
                 className="input-base px-3 py-2 text-sm"
                 list="networks"
-                placeholder="e.g. nesa-node"
+                placeholder="e.g. Foundry · MetaMask · nesa-node"
                 value={network}
                 onChange={(e) => setNetwork(e.target.value)}
               />
@@ -137,7 +237,7 @@ export default function Home() {
             </div>
             <div>
               <label className="block text-xs font-mono uppercase tracking-wider text-ink-400 mb-1.5">
-                OS <span className="text-ink-500">(optional)</span>
+                OS / environment <span className="text-ink-500">(optional)</span>
               </label>
               <input
                 className="input-base px-3 py-2 text-sm"
@@ -154,7 +254,7 @@ export default function Home() {
             </summary>
             <textarea
               className="mt-2 input-base text-sm p-3 resize-y min-h-[80px]"
-              placeholder="What were you doing when this happened? Recent changes, restart, upgrade, etc."
+              placeholder="What were you doing when this happened? Recent changes, restart, upgrade, chain switch, etc."
               value={extra}
               onChange={(e) => setExtra(e.target.value)}
             />
@@ -209,6 +309,31 @@ export default function Home() {
             </div>
           </article>
         )}
+      </section>
+
+      <section className="relative max-w-3xl mx-auto px-6 mt-16">
+        <h3 className="text-center font-mono text-xs uppercase tracking-wider text-ink-400 mb-6">
+          What we troubleshoot
+        </h3>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {[
+            ['Node & validator logs', 'Cosmos SDK, CometBFT, Substrate, EVM clients — panics, peer timeouts, state corruption.'],
+            ['RPC & transport errors', '429 / 502 / timeouts, malformed JSON-RPC, provider drift, eth_call failures.'],
+            ['Failed testnet transactions', 'Reverts, nonce mismatch, replacement underpriced, gas estimation failures.'],
+            ['MetaMask & wallet automation', 'Playwright/Puppeteer popup races, chain id mismatch, "user rejected request".'],
+            ['Faucets', 'Rate limits, captcha failures, IP bans, drip queues, eligibility errors.'],
+            ['Bridges, swaps, mints', 'LayerZero/Wormhole/Hop, Uniswap/1inch slippage, NFT mint reverts, allowance issues.'],
+            ['Docker & Linux services', 'Restart loops, port conflicts, OOMKilled, journalctl traces, permission denied.'],
+            ['npm / pnpm / pip', 'Peer-dep conflicts, ENOENT, module not found, Python resolver failures.'],
+            ['Smart contracts', 'Decoded revert reasons, ABI mismatches, Foundry/Hardhat errors, Solidity compiler.'],
+            ['Airdrop workflows', 'Eligibility checks, claim transactions, proof generation, missed snapshots.'],
+          ].map(([t, d]) => (
+            <div key={t} className="glass rounded-xl p-4">
+              <div className="text-sm font-semibold text-ink-50">{t}</div>
+              <div className="text-xs text-ink-400 mt-1 leading-relaxed">{d}</div>
+            </div>
+          ))}
+        </div>
       </section>
 
       <footer className="relative max-w-6xl mx-auto px-6 pt-20 pb-10 text-center">

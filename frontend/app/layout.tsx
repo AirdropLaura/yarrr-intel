@@ -2,13 +2,14 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Yarrr.Tech — AI diagnostics for node operators',
+  title: 'Yarrr.Tech — AI co-pilot for Web3 operators',
   description:
-    'Paste a stack trace or log file. Get root cause and exact fix commands. Built for testnet & validator node operators. Powered by Xiaomi MiMo V2.5.',
+    'Paste any Web3 ops failure — node logs, RPC errors, tx reverts, MetaMask timeouts, faucet issues, bridge/mint errors, Docker, npm, smart contracts. Get root cause and exact fix. Powered by Xiaomi MiMo V2.5.',
   metadataBase: new URL('https://yarrr-node.com'),
   openGraph: {
     title: 'Yarrr.Tech',
-    description: 'AI-native diagnostics for testnet & validator node operators.',
+    description:
+      'AI co-pilot for Web3 testnet operators, node runners, and airdrop builders.',
     url: 'https://yarrr-node.com',
     siteName: 'Yarrr.Tech',
     type: 'website',
@@ -16,7 +17,8 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Yarrr.Tech',
-    description: 'AI-native diagnostics for testnet & validator node operators.',
+    description:
+      'AI co-pilot for Web3 testnet operators, node runners, and airdrop builders.',
   },
 };
 
