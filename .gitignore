@@ -1,0 +1,42 @@
+# Build artifacts
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# Env / secrets — never commit
+.env
+.env.local
+.env.production
+*.key
+*.pem
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Tests
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Misc
+.cache/
+.turbo/

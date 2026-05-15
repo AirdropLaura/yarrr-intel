@@ -1,0 +1,27 @@
+{
+  "name": "yarrr-tech",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-native diagnostics for testnet & validator node operators",
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5"
+  }
+}

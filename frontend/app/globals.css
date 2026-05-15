@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-ink-900 text-ink-50 antialiased;
+    background-image:
+      radial-gradient(ellipse at 50% -20%, rgba(251, 191, 36, 0.08), transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(15, 23, 42, 0.6), transparent 50%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    @apply bg-gold-400/30 text-gold-400;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-ink-800/40 backdrop-blur-xl border border-ink-700/50;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg
+           bg-gold-400 text-ink-900 font-semibold px-5 py-2.5
+           hover:bg-gold-500 transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 rounded-lg
+           border border-ink-700 px-4 py-2 text-sm
+           text-ink-300 hover:text-ink-50 hover:border-ink-500 transition-colors;
+  }
+  .input-base {
+    @apply w-full rounded-lg bg-ink-800/60 border border-ink-700
+           text-ink-50 placeholder:text-ink-400
+           focus:outline-none focus:ring-2 focus:ring-gold-400/40 focus:border-gold-400/60
+           transition-colors;
+  }
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(30, 41, 59, 0.5) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(30, 41, 59, 0.5) 1px, transparent 1px);
+    background-size: 48px 48px;
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+            mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  }
+}
+
+/* Markdown rendering */
+.prose-yarrr {
+  @apply text-ink-100 leading-relaxed;
+}
+.prose-yarrr h2 {
+  @apply text-xl font-bold text-gold-400 mt-6 mb-3;
+}
+.prose-yarrr h3 {
+  @apply text-base font-semibold text-ink-50 mt-5 mb-2;
+}
+.prose-yarrr p {
+  @apply mb-3;
+}
+.prose-yarrr ul, .prose-yarrr ol {
+  @apply mb-3 pl-5 space-y-1.5;
+}
+.prose-yarrr ul { @apply list-disc; }
+.prose-yarrr ol { @apply list-decimal; }
+.prose-yarrr li { @apply text-ink-100; }
+.prose-yarrr code {
+  @apply bg-ink-700/60 text-gold-400 px-1.5 py-0.5 rounded text-sm font-mono;
+}
+.prose-yarrr pre {
+  @apply bg-ink-900/80 border border-ink-700 rounded-lg p-4 overflow-x-auto my-4;
+}
+.prose-yarrr pre code {
+  @apply bg-transparent text-ink-100 p-0;
+}
+.prose-yarrr strong {
+  @apply text-ink-50 font-semibold;
+}
+.prose-yarrr a {
+  @apply text-gold-400 underline underline-offset-2 hover:text-gold-500;
+}
