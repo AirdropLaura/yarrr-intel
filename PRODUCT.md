@@ -184,6 +184,11 @@ Keep it simple. Big input, sharp output, share button.
 - [x] **3.5** Routescan provider (`backend/providers/routescan.py`) — Etherscan-V1-compatible API surface for Avalanche L1/subnets and other non-V2 EVM chains. Provider registered, framework ready; chains added on demand. Starknet skipped — non-EVM, out of EVM-focused product scope.
 - [x] **3.6** Webhook subscriptions (`backend/webhooks.py`) — SQLite-backed wallet subscription table, async background watcher polling every 15 minutes, deterministic state diff (primary archetype, reputation bucket, dormancy, new chains), HTTP POST delivery. Auto-pause after 5 consecutive failures. Endpoints: `POST /api/webhooks`, `GET /api/webhooks`, `DELETE /api/webhooks/{id}`. Idempotent on (address, url).
 
+### Phase 4 — Coverage & Comparative Analysis (v0.10)
+- [x] **4.1** Hero copy + system prompt updated to reflect actual coverage (22 mainnets + 15 testnets, not "5 chains")
+- [x] **4.2** Dynamic contract name resolver (`backend/contract_names.py`) — 7-stage pipeline: curated dict → SQLite cache → ERC20/NFT name harvest → Etherscan V2 `getsourcecode` → method-selector heuristic → ETH-transfer pattern detection → short-address fallback. Cross-chain token name reuse, TTL 30d hits / 6h misses.
+- [x] **4.3** Multi-address comparative analysis — `POST /api/analyze/multi` (2-10 wallets, parallel digest fetch, single comparative LLM call with `MULTI_SYSTEM_PROMPT`). Frontend Single/Multi mode toggle + textarea parsing newline/comma/space.
+
 ---
 
 ## Mission
