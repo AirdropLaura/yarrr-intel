@@ -130,6 +130,21 @@ async def _get_or_fetch_digest(address: str) -> dict:
                 "distinct_nft_collections": digest.tokens.distinct_nft_collections,
                 "spam_nft_count": digest.tokens.spam_nft_count,
                 "spam_nft_examples": digest.tokens.spam_nft_examples,
+                "holdings": [
+                    {
+                        "chain": h.chain,
+                        "contract": h.contract,
+                        "symbol": h.symbol,
+                        "name": h.name,
+                        "decimals": h.decimals,
+                        "amount": h.amount,
+                        "is_stablecoin": h.is_stablecoin,
+                        "is_lp": h.is_lp,
+                        "is_lst": h.is_lst,
+                        "is_spam": h.is_spam,
+                    }
+                    for h in digest.tokens.holdings
+                ],
             },
             "failed_tx_clusters": [
                 {

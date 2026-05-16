@@ -14,6 +14,19 @@ type ArchetypeOut = {
   evidence: string[];
 };
 
+type TokenHolding = {
+  chain: string;
+  contract: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  amount: number;
+  is_stablecoin: boolean;
+  is_lp: boolean;
+  is_lst: boolean;
+  is_spam: boolean;
+};
+
 type TokenSignals = {
   stablecoin_volume_usd: number;
   stablecoin_chains: string[];
@@ -24,6 +37,7 @@ type TokenSignals = {
   distinct_nft_collections: number;
   spam_nft_count: number;
   spam_nft_examples: string[];
+  holdings?: TokenHolding[];
 };
 
 type FailedTxCluster = {
@@ -140,6 +154,16 @@ function formatBalance(n: number) {
   if (n < 1) return n.toFixed(4);
   if (n < 1000) return n.toFixed(2);
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function formatTokenAmount(n: number) {
+  if (n === 0) return '0';
+  if (n < 0.0001) return '< 0.0001';
+  if (n < 1) return n.toFixed(4);
+  if (n < 1_000) return n.toFixed(2);
+  if (n < 1_000_000) return `${(n / 1_000).toFixed(1)}K`;
+  if (n < 1_000_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  return `${(n / 1_000_000_000).toFixed(2)}B`;
 }
 
 function shortAddr(a: string) {
@@ -351,12 +375,25 @@ export default function Home() {
             <p className="mt-2 text-sm text-ink-200 leading-relaxed">
               {t.introBody}
             </p>
-            <div className="mt-3 flex items-center gap-2 text-xs font-mono text-ink-400">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-mono text-ink-400">
               <span>{t.builtBy}</span>
               <span className="px-2 py-0.5 rounded-full bg-gold-400/10 border border-gold-400/30 text-gold-400 font-semibold">
                 {t.builtByName}
               </span>
               <span className="text-ink-500">· {t.builtByRole}</span>
+              <a
+                href="https://t.me/Yarrr23"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-400/30 text-sky-300 hover:text-sky-200 hover:bg-sky-500/20 hover:border-sky-400/50 transition-colors"
+                aria-label="Telegram @Yarrr23"
+                title="Telegram @Yarrr23"
+              >
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
+                </svg>
+                <span>@Yarrr23</span>
+              </a>
             </div>
           </div>
         </div>
@@ -1051,9 +1088,18 @@ function ArchetypePanel({ digest }: { digest: Digest }) {
 
 function DigestPanel({ digest }: { digest: Digest }) {
   const { t } = useLang();
+  // Show balances for ALL active chains (mainnet + testnet) — testnet wallets
+  // need to see their faucet balance just like mainnet wallets need to see ETH.
   const mainnetBalances = digest.mainnet_chains_active
     .map((c) => [c, digest.balances_by_chain[c] || 0] as const)
     .filter(([, bal]) => bal > 0);
+  const testnetBalances = digest.testnet_chains_active
+    .map((c) => [c, digest.balances_by_chain[c] || 0] as const)
+    .filter(([, bal]) => bal > 0);
+
+  const holdings = digest.tokens?.holdings || [];
+  const realHoldings = holdings.filter((h) => !h.is_spam);
+  const spamHoldings = holdings.filter((h) => h.is_spam);
 
   return (
     <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-gold-400/5">
@@ -1102,18 +1148,89 @@ function DigestPanel({ digest }: { digest: Digest }) {
         )}
       </div>
 
-      {mainnetBalances.length > 0 && (
+      {(mainnetBalances.length > 0 || testnetBalances.length > 0) && (
         <div className="mb-4">
           <SectionLabel>{t.nativeBalances}</SectionLabel>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {mainnetBalances.map(([chain, bal]) => (
-              <div key={chain} className="px-3 py-2 rounded-lg bg-ink-800/60 border border-ink-700/60">
-                <div className={`text-[11px] font-mono uppercase tracking-wider ${CHAIN_COLORS[chain] ?? 'text-ink-300'}`}>{chain}</div>
-                <div className="text-sm font-mono mt-0.5">{formatBalance(bal)}</div>
+          {mainnetBalances.length > 0 && (
+            <div className="mb-3">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-ink-500 mb-1.5">
+                {t.chainsMainnet}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {mainnetBalances.map(([chain, bal]) => (
+                  <div key={chain} className="px-3 py-2 rounded-lg bg-ink-800/60 border border-ink-700/60">
+                    <div className={`text-[11px] font-mono uppercase tracking-wider ${CHAIN_COLORS[chain] ?? 'text-ink-300'}`}>{chain}</div>
+                    <div className="text-sm font-mono mt-0.5">{formatBalance(bal)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {testnetBalances.length > 0 && (
+            <div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-ink-500 mb-1.5">
+                {t.chainsTestnet}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {testnetBalances.map(([chain, bal]) => (
+                  <div key={chain} className="px-3 py-2 rounded-lg bg-ink-800/40 border border-ink-700/40">
+                    <div className="text-[11px] font-mono uppercase tracking-wider text-ink-400">{chain}</div>
+                    <div className="text-sm font-mono mt-0.5 text-ink-200">{formatBalance(bal)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {realHoldings.length > 0 && (
+        <div className="mb-4">
+          <SectionLabel>{t.tokenHoldings} <span className="text-ink-500 font-normal text-[10px] ml-1">{t.tokenHoldingsHint}</span></SectionLabel>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {realHoldings.map((h, i) => (
+              <div key={`${h.chain}-${h.contract}-${i}`} className="px-3 py-2 rounded-lg bg-ink-800/60 border border-ink-700/60 flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-mono font-semibold truncate">{h.symbol || '???'}</span>
+                    {h.is_stablecoin && (
+                      <span className="px-1 py-px rounded bg-emerald-900/40 border border-emerald-700/40 text-[9px] font-mono text-emerald-300 uppercase">stable</span>
+                    )}
+                    {h.is_lp && (
+                      <span className="px-1 py-px rounded bg-blue-900/40 border border-blue-700/40 text-[9px] font-mono text-blue-300 uppercase">LP</span>
+                    )}
+                    {h.is_lst && (
+                      <span className="px-1 py-px rounded bg-purple-900/40 border border-purple-700/40 text-[9px] font-mono text-purple-300 uppercase">LST</span>
+                    )}
+                  </div>
+                  <div className={`text-[10px] font-mono uppercase tracking-wider ${CHAIN_COLORS[h.chain] ?? 'text-ink-400'}`}>{h.chain}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-mono">{formatTokenAmount(h.amount)}</div>
+                </div>
               </div>
             ))}
           </div>
         </div>
+      )}
+
+      {spamHoldings.length > 0 && (
+        <details className="mb-4 rounded-lg border border-amber-700/30 bg-amber-950/20">
+          <summary className="cursor-pointer px-3 py-2 text-[11px] font-mono text-amber-300/80 hover:text-amber-200">
+            {t.spamHoldings.replace('{n}', spamHoldings.length.toString())}
+          </summary>
+          <div className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {spamHoldings.map((h, i) => (
+              <div key={`spam-${h.chain}-${h.contract}-${i}`} className="text-[11px] font-mono text-ink-400">
+                <span className={`uppercase tracking-wider ${CHAIN_COLORS[h.chain] ?? 'text-ink-500'}`}>{h.chain}</span>
+                {' · '}
+                <span className="text-amber-300/70">{h.symbol || '???'}</span>
+                {' '}
+                <span className="text-ink-500">{formatTokenAmount(h.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
 
       {Object.keys(digest.activity_categories).length > 0 && (

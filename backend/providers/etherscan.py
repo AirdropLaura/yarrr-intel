@@ -176,18 +176,22 @@ class EtherscanV2Provider(ChainProvider):
         except Exception as e:
             sub_errors.append(f"txlistinternal:{type(e).__name__}")
 
-        # --- ERC20 + NFT (primary mainnets only) ----------------------------
-        if chain.tier == "primary" and not chain.is_testnet:
-            try:
-                erc20 = await _call(client, chain.chain_id, {
-                    "module": "account", "action": "tokentx", "address": address,
-                    "page": 1, "offset": 50, "sort": "desc",
-                }, key)
-                if erc20.get("status") == "1" and isinstance(erc20.get("result"), list):
-                    cd.erc20_transfers = [_normalize_erc20(t, chain.slug) for t in erc20["result"]]
-            except Exception as e:
-                sub_errors.append(f"tokentx:{type(e).__name__}")
+        # --- ERC20 transfers — all active chains (primary/secondary/tertiary,
+        #     mainnet + testnet) so we can derive holdings for testnet wallets
+        #     too. Capped offset per tier keeps rate-limit budget bounded.
+        try:
+            erc20 = await _call(client, chain.chain_id, {
+                "module": "account", "action": "tokentx", "address": address,
+                "page": 1, "offset": offset, "sort": "desc",
+            }, key)
+            if erc20.get("status") == "1" and isinstance(erc20.get("result"), list):
+                cd.erc20_transfers = [_normalize_erc20(t, chain.slug) for t in erc20["result"]]
+        except Exception as e:
+            sub_errors.append(f"tokentx:{type(e).__name__}")
 
+        # --- NFT transfers — primary mainnets only (NFT spam detection is
+        #     mainnet-relevant; saves RPS on long-tail testnets).
+        if chain.tier == "primary" and not chain.is_testnet:
             try:
                 nft = await _call(client, chain.chain_id, {
                     "module": "account", "action": "tokennfttx", "address": address,

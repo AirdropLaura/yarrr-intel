@@ -126,6 +126,25 @@ def _classify_method(method: str) -> str | None:
 
 
 @dataclass
+class TokenHolding:
+    """Approximate ERC20 holding from net flow (transfers in − out).
+
+    NOT exact — we only see the most recent N tokentx events per chain. Use
+    this for "wallet currently holds ~X USDC" signals, treat as best-effort.
+    """
+    chain: str
+    contract: str
+    symbol: str
+    name: str
+    decimals: int
+    amount: float           # net flow (in − out) in token units
+    is_stablecoin: bool = False
+    is_lp: bool = False
+    is_lst: bool = False
+    is_spam: bool = False
+
+
+@dataclass
 class TokenSignals:
     """Aggregated ERC20 + NFT activity signals across all chains."""
     stablecoin_volume_usd: float = 0.0          # rough sum of stablecoin transfer amounts
@@ -137,6 +156,8 @@ class TokenSignals:
     distinct_nft_collections: int = 0
     spam_nft_count: int = 0
     spam_nft_examples: list[str] = field(default_factory=list)
+    # Net-flow holdings — top tokens with positive balance from observed transfers.
+    holdings: list[TokenHolding] = field(default_factory=list)
 
 
 @dataclass
@@ -298,11 +319,16 @@ def _infer_funding_source(all_txs: list[dict], wallet: str) -> tuple[str | None,
 
 
 def _analyze_tokens(all_chain_data: list[ChainData], wallet: str) -> TokenSignals:
-    """Aggregate ERC20 + NFT signals across primary mainnets.
+    """Aggregate ERC20 + NFT signals across all chains.
 
     Stablecoin volume is approximated by summing transfer amounts (in token
     units, treating 1 stablecoin ≈ 1 USD). Good enough for "this wallet moved
     tens of thousands of dollars in stablecoins" inference. Not exact.
+
+    Holdings are derived from net flow (incoming − outgoing) per (chain,
+    contract) pair across BOTH mainnets and testnets. Best-effort because
+    we only see the most recent N tokentx events; long-tail balances may be
+    truncated.
     """
     sigs = TokenSignals()
     sc_volume = 0.0
@@ -315,28 +341,90 @@ def _analyze_tokens(all_chain_data: list[ChainData], wallet: str) -> TokenSignal
     nft_collections: set[str] = set()
     spam_nfts: list[str] = []
 
+    # (chain, contract) -> {meta, in, out}
+    flows: dict[tuple[str, str], dict] = {}
+    wallet_l = wallet.lower()
+
     for cd in all_chain_data:
-        if cd.is_testnet:
-            continue
+        # Stablecoin signals + spam NFTs are mainnet-only (testnet stables
+        # don't carry economic meaning).
         for tx in cd.erc20_transfers:
-            sym = is_stablecoin(tx.contract)
-            if sym:
-                sc_volume += tx.amount
-                sc_chains.add(cd.chain)
-                sc_symbols.add(sym)
-            else:
-                erc20_contracts.add(tx.contract)
-                if is_lp_token(tx.symbol):
-                    lp_seen = True
-                if is_lst_token(tx.symbol):
-                    lst_seen = True
+            key = (cd.chain, tx.contract)
+            entry = flows.get(key)
+            if entry is None:
+                stable_sym = is_stablecoin(tx.contract)
+                entry = {
+                    "symbol": tx.symbol or "",
+                    "name": tx.name or "",
+                    "decimals": tx.decimals,
+                    "in": 0.0,
+                    "out": 0.0,
+                    "is_testnet": cd.is_testnet,
+                    "is_stablecoin": bool(stable_sym),
+                    "stable_symbol": stable_sym,
+                    "is_lp": is_lp_token(tx.symbol),
+                    "is_lst": is_lst_token(tx.symbol),
+                }
+                flows[key] = entry
+
+            to_l = (tx.to_addr or "").lower()
+            from_l = (tx.from_addr or "").lower()
+            if to_l == wallet_l:
+                entry["in"] += tx.amount
+            elif from_l == wallet_l:
+                entry["out"] += tx.amount
+
+            if not cd.is_testnet:
+                if entry["is_stablecoin"]:
+                    sc_volume += tx.amount
+                    sc_chains.add(cd.chain)
+                    if entry["stable_symbol"]:
+                        sc_symbols.add(entry["stable_symbol"])
+                else:
+                    erc20_contracts.add(tx.contract)
+                    if entry["is_lp"]:
+                        lp_seen = True
+                    if entry["is_lst"]:
+                        lst_seen = True
 
         for nft in cd.nft_transfers:
+            if cd.is_testnet:
+                continue
             nft_collections.add(f"{cd.chain}:{nft.contract}")
             if looks_like_spam_nft(nft.name, nft.symbol):
-                if (nft.to_addr or "").lower() == wallet:
+                if (nft.to_addr or "").lower() == wallet_l:
                     label = nft.name or nft.symbol or nft.contract[:12]
                     spam_nfts.append(label)
+
+    # Build holdings list — net flow > dust threshold per token.
+    holdings: list[TokenHolding] = []
+    for (chain, contract), e in flows.items():
+        net = e["in"] - e["out"]
+        # Stables: keep if net >= 0.5 (so $1 USDC shows). Others: keep if net >= 0.0001
+        # to filter dust-spam tokens.
+        threshold = 0.5 if e["is_stablecoin"] else 0.0001
+        if net < threshold:
+            continue
+        is_spam = looks_like_spam_nft(e["name"], e["symbol"])
+        holdings.append(TokenHolding(
+            chain=chain,
+            contract=contract,
+            symbol=e["symbol"][:24],
+            name=e["name"][:60],
+            decimals=e["decimals"],
+            amount=round(net, 6),
+            is_stablecoin=e["is_stablecoin"],
+            is_lp=e["is_lp"],
+            is_lst=e["is_lst"],
+            is_spam=is_spam,
+        ))
+    # Rank: stablecoins first (by amount desc), then non-spam tokens (by amount),
+    # spam last. Cap at 30 to keep payload reasonable.
+    holdings.sort(key=lambda h: (
+        0 if h.is_stablecoin else (2 if h.is_spam else 1),
+        -h.amount,
+    ))
+    sigs.holdings = holdings[:30]
 
     sigs.stablecoin_volume_usd = round(sc_volume, 2)
     sigs.stablecoin_chains = sorted(sc_chains)

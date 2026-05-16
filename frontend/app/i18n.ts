@@ -108,6 +108,9 @@ export type Dict = {
   statAge: string;
   partialWarning: string;
   nativeBalances: string;
+  tokenHoldings: string;
+  tokenHoldingsHint: string;
+  spamHoldings: string;
   activityCategories: string;
   heuristicFlags: string;
   topContracts: string;
@@ -232,6 +235,9 @@ export const T: Record<Lang, Dict> = {
     statAge: 'Umur wallet',
     partialWarning: 'Sebagian data ({n} chain) tidak lengkap karena Etherscan rate-limit. Coba ulangi sebentar lagi untuk hasil penuh.',
     nativeBalances: 'Saldo native',
+    tokenHoldings: 'Token holdings',
+    tokenHoldingsHint: '(perkiraan dari net flow)',
+    spamHoldings: 'Token spam tersembunyi ({n})',
     activityCategories: 'Kategori aktivitas',
     heuristicFlags: 'Flag heuristik',
     topContracts: 'Kontrak counterparty teratas',
@@ -354,6 +360,9 @@ export const T: Record<Lang, Dict> = {
     statAge: 'Wallet age',
     partialWarning: 'Some data ({n} chains) is incomplete due to Etherscan rate limits. Retry shortly for full results.',
     nativeBalances: 'Native balances',
+    tokenHoldings: 'Token holdings',
+    tokenHoldingsHint: '(approximate, from net flow)',
+    spamHoldings: 'Hidden spam tokens ({n})',
     activityCategories: 'Activity categories',
     heuristicFlags: 'Heuristic flags',
     topContracts: 'Top counterparty contracts',
