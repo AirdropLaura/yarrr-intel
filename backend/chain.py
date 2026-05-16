@@ -1,28 +1,29 @@
-"""Multichain onchain data fetcher — MVP scope.
+"""Multichain onchain data fetcher.
 
-Strategy: hybrid free-tier coverage.
-- Etherscan V2 (1 key) → Ethereum, Polygon, Arbitrum
-- Blockscout (free, public) → Base, Optimism
+Strategy: Etherscan V2 (single API key, multi-chain by chain_id) for the
+broadest coverage, with Blockscout as a fallback for chains outside V2.
 
-For each chain we fetch only:
+Layer 1 of the 3-layer pipeline. Breadth-first: we'd rather know a wallet
+touched 12 chains shallowly than know 5 chains in deep detail. The profiler
+turns shallow signal into sharp behavioral inference.
+
+Per chain we collect:
 - Native balance
-- Last 50 normal transactions (txlist) — reveals contract interactions
-
-We deliberately skip ERC20 tokentx in MVP because:
-1. Most behavior signal is already in txlist (counterparty contracts).
-2. Free tier Blockscout endpoints time out frequently on tokentx.
-3. Profiler can classify counterparty contracts via known-address heuristics.
-
-If the user demand justifies it, we can add tokentx back as a paid-tier upgrade.
+- Last N normal transactions (txlist) — reveals contract interactions
+- Failed/revert flag, method name, counterparty, gas — keeps profiler signals
+  rich without ERC20/NFT ingestion (those land in Phase 2).
 """
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from dataclasses import dataclass, field
 from typing import Iterable
 
 import httpx
+
+log = logging.getLogger("yarrr-intel.chain")
 
 
 def _load_etherscan_key() -> str | None:
@@ -43,18 +44,107 @@ class Chain:
     slug: str
     label: str
     symbol: str
-    provider: str  # "etherscan" or "blockscout"
+    provider: str           # "etherscan" or "blockscout"
     chain_id: int | None = None
     blockscout_base: str | None = None
+    is_testnet: bool = False
+    # `tier` controls per-call tx fetch budget. mainnet_primary chains get
+    # deeper history; tertiary chains stay shallow to keep total latency low.
+    tier: str = "primary"   # primary | secondary | tertiary
 
 
-CHAINS: list[Chain] = [
-    Chain("ethereum", "Ethereum",  "ETH",   "etherscan",  chain_id=1),
-    Chain("polygon",  "Polygon",   "MATIC", "etherscan",  chain_id=137),
-    Chain("arbitrum", "Arbitrum",  "ETH",   "etherscan",  chain_id=42161),
-    Chain("base",     "Base",      "ETH",   "blockscout", blockscout_base="https://base.blockscout.com/api"),
-    Chain("optimism", "Optimism",  "ETH",   "blockscout", blockscout_base="https://explorer.optimism.io/api"),
+# ---------------------------------------------------------------------------
+# Chain registry — Etherscan V2 covers all these with one API key.
+# Reference: https://docs.etherscan.io/etherscan-v2/getting-started/v2-quickstart
+#
+# Adding a chain = adding one row here. Profiler is chain-agnostic.
+# ---------------------------------------------------------------------------
+MAINNETS: list[Chain] = [
+    # Tier 1 — primary EVM hubs
+    Chain("ethereum",  "Ethereum",   "ETH",   "etherscan", chain_id=1,         tier="primary"),
+    Chain("base",      "Base",       "ETH",   "etherscan", chain_id=8453,      tier="primary"),
+    Chain("arbitrum",  "Arbitrum",   "ETH",   "etherscan", chain_id=42161,     tier="primary"),
+    Chain("optimism",  "Optimism",   "ETH",   "etherscan", chain_id=10,        tier="primary"),
+    Chain("polygon",   "Polygon",    "POL",   "etherscan", chain_id=137,       tier="primary"),
+    # Tier 2 — major secondary chains
+    Chain("bsc",       "BNB Chain",  "BNB",   "etherscan", chain_id=56,        tier="secondary"),
+    Chain("avalanche", "Avalanche",  "AVAX",  "etherscan", chain_id=43114,     tier="secondary"),
+    Chain("linea",     "Linea",      "ETH",   "etherscan", chain_id=59144,     tier="secondary"),
+    Chain("scroll",    "Scroll",     "ETH",   "etherscan", chain_id=534352,    tier="secondary"),
+    Chain("blast",     "Blast",      "ETH",   "etherscan", chain_id=81457,     tier="secondary"),
+    # Tier 3 — long tail
+    Chain("mantle",    "Mantle",     "MNT",   "etherscan", chain_id=5000,      tier="tertiary"),
+    Chain("worldchain","World Chain","ETH",   "etherscan", chain_id=480,       tier="tertiary"),
+    Chain("opbnb",     "opBNB",      "BNB",   "etherscan", chain_id=204,       tier="tertiary"),
+    Chain("gnosis",    "Gnosis",     "xDAI",  "etherscan", chain_id=100,       tier="tertiary"),
+    Chain("celo",      "Celo",       "CELO",  "etherscan", chain_id=42220,     tier="tertiary"),
+    Chain("zksync",    "zkSync Era", "ETH",   "etherscan", chain_id=324,       tier="tertiary"),
+    # Tier 3 — emerging ecosystems (2025+ launches)
+    Chain("berachain", "Berachain",  "BERA",  "etherscan", chain_id=80094,     tier="tertiary"),
+    Chain("monad",     "Monad",      "MON",   "etherscan", chain_id=143,       tier="tertiary"),
+    Chain("sonic",     "Sonic",      "S",     "etherscan", chain_id=146,       tier="tertiary"),
+    Chain("abstract",  "Abstract",   "ETH",   "etherscan", chain_id=2741,      tier="tertiary"),
+    Chain("taiko",     "Taiko",      "ETH",   "etherscan", chain_id=167000,    tier="tertiary"),
+    Chain("fraxtal",   "Fraxtal",    "frxETH","etherscan", chain_id=252,       tier="tertiary"),
 ]
+
+TESTNETS: list[Chain] = [
+    # Active testnet ecosystems — major airdrop farming territory.
+    Chain("sepolia",         "Sepolia",         "ETH",  "etherscan", chain_id=11155111,  is_testnet=True, tier="secondary"),
+    Chain("holesky",         "Holesky",         "ETH",  "etherscan", chain_id=17000,     is_testnet=True, tier="tertiary"),
+    Chain("base-sepolia",    "Base Sepolia",    "ETH",  "etherscan", chain_id=84532,     is_testnet=True, tier="secondary"),
+    Chain("arbitrum-sepolia","Arbitrum Sepolia","ETH",  "etherscan", chain_id=421614,    is_testnet=True, tier="secondary"),
+    Chain("optimism-sepolia","Optimism Sepolia","ETH",  "etherscan", chain_id=11155420,  is_testnet=True, tier="tertiary"),
+    Chain("polygon-amoy",    "Polygon Amoy",    "POL",  "etherscan", chain_id=80002,     is_testnet=True, tier="tertiary"),
+    Chain("bsc-testnet",     "BSC Testnet",     "BNB",  "etherscan", chain_id=97,        is_testnet=True, tier="tertiary"),
+    Chain("linea-sepolia",   "Linea Sepolia",   "ETH",  "etherscan", chain_id=59141,     is_testnet=True, tier="tertiary"),
+    Chain("scroll-sepolia",  "Scroll Sepolia",  "ETH",  "etherscan", chain_id=534351,    is_testnet=True, tier="tertiary"),
+    Chain("blast-sepolia",   "Blast Sepolia",   "ETH",  "etherscan", chain_id=168587773, is_testnet=True, tier="tertiary"),
+    # Emerging ecosystem testnets (heavy airdrop farming territory in 2025-2026)
+    Chain("berachain-bepolia","Berachain Bepolia","BERA","etherscan", chain_id=80069,     is_testnet=True, tier="tertiary"),
+    Chain("monad-testnet",   "Monad Testnet",   "MON",  "etherscan", chain_id=10143,     is_testnet=True, tier="tertiary"),
+    Chain("sonic-testnet",   "Sonic Testnet",   "S",    "etherscan", chain_id=14601,     is_testnet=True, tier="tertiary"),
+    Chain("abstract-sepolia","Abstract Sepolia","ETH",  "etherscan", chain_id=11124,     is_testnet=True, tier="tertiary"),
+    Chain("mantle-sepolia",  "Mantle Sepolia",  "MNT",  "etherscan", chain_id=5003,      is_testnet=True, tier="tertiary"),
+]
+
+# Convenience: tier → max txlist offset (caps fetch cost on long-tail chains).
+_TIER_LIMITS = {"primary": 50, "secondary": 30, "tertiary": 20}
+
+# Default scan profile: all mainnets + all major testnets.
+ALL_CHAINS: list[Chain] = MAINNETS + TESTNETS
+
+# Backwards-compat with old import sites (chain.py was historically `CHAINS`).
+CHAINS: list[Chain] = ALL_CHAINS
+
+
+@dataclass
+class TokenTransfer:
+    """ERC20 transfer normalized across providers."""
+    chain: str
+    ts: int
+    hash: str
+    from_addr: str
+    to_addr: str
+    contract: str
+    symbol: str
+    name: str
+    amount: float       # human-readable, decimals applied
+    decimals: int
+
+
+@dataclass
+class NFTTransfer:
+    """ERC721/ERC1155 transfer normalized across providers."""
+    chain: str
+    ts: int
+    hash: str
+    from_addr: str
+    to_addr: str
+    contract: str
+    symbol: str
+    name: str
+    token_id: str
 
 
 @dataclass
@@ -62,17 +152,21 @@ class ChainData:
     chain: str
     label: str
     symbol: str
+    is_testnet: bool = False
     balance: float = 0.0
     tx_count: int = 0
     txs: list[dict] = field(default_factory=list)
+    erc20_transfers: list[TokenTransfer] = field(default_factory=list)
+    nft_transfers: list[NFTTransfer] = field(default_factory=list)
     error: str | None = None
 
 
-_UA = {"User-Agent": "Yarrr.Intel/0.1 (+https://yarrr-node.com)"}
+_UA = {"User-Agent": "Yarrr.Tech/0.4 (+https://yarrr-node.com)"}
 _ETHERSCAN_BASE = "https://api.etherscan.io/v2/api"
-# Etherscan free tier: 5 calls/sec across all chains. Allow 3 concurrent in flight
-# (each call takes 200-500ms on average, so ~6-15 rps cap = under the 5/sec ceiling).
-_ETHERSCAN_LOCK = asyncio.Semaphore(3)
+
+# Etherscan free tier: 5 calls/sec across all chains. We cap concurrency at 4
+# to leave headroom for retry bursts and stay under the rate limit.
+_ETHERSCAN_LOCK = asyncio.Semaphore(4)
 
 
 async def _es_call(client: httpx.AsyncClient, chain_id: int, params: dict, key: str) -> dict:
@@ -81,7 +175,6 @@ async def _es_call(client: httpx.AsyncClient, chain_id: int, params: dict, key: 
         r = await client.get(_ETHERSCAN_BASE, params=p, timeout=15.0)
     r.raise_for_status()
     data = r.json()
-    # Etherscan signals throttling via {"status":"0","message":"NOTOK","result":"Max rate limit reached"}
     if isinstance(data.get("result"), str) and "rate limit" in data["result"].lower():
         await asyncio.sleep(1.0)
         async with _ETHERSCAN_LOCK:
@@ -107,47 +200,29 @@ async def _bs_call(client: httpx.AsyncClient, base: str, params: dict, retries: 
 
 
 async def _fetch_etherscan(client: httpx.AsyncClient, chain: Chain, address: str, key: str) -> ChainData:
-    cd = ChainData(chain=chain.slug, label=chain.label, symbol=chain.symbol)
-    try:
-        bal = await _es_call(client, chain.chain_id, {"module": "account", "action": "balance", "address": address, "tag": "latest"}, key)
-        if bal.get("status") == "1":
-            try:
-                cd.balance = int(bal["result"]) / 1e18
-            except (TypeError, ValueError):
-                pass
+    """LEGACY shim — delegates to the EtherscanV2Provider in providers/.
 
-        txs = await _es_call(client, chain.chain_id, {
-            "module": "account", "action": "txlist", "address": address,
-            "startblock": 0, "endblock": 99999999, "page": 1, "offset": 50, "sort": "desc",
-        }, key)
-        if txs.get("status") == "1" and isinstance(txs.get("result"), list):
-            cd.tx_count = len(txs["result"])
-            cd.txs = [_normalize_tx(t, chain.slug) for t in txs["result"]]
-    except Exception as e:
-        cd.error = f"{type(e).__name__}: {str(e)[:120]}"
-    return cd
+    Kept so tests / external callers that imported the old name still work
+    until they migrate to `dispatch_fetch`.
+    """
+    from .providers import get
+    p = get("etherscan")
+    if p is None:
+        cd = ChainData(chain=chain.slug, label=chain.label, symbol=chain.symbol, is_testnet=chain.is_testnet)
+        cd.error = "etherscan provider not registered"
+        return cd
+    return await p.fetch(client, chain, address)
 
 
 async def _fetch_blockscout(client: httpx.AsyncClient, chain: Chain, address: str) -> ChainData:
-    cd = ChainData(chain=chain.slug, label=chain.label, symbol=chain.symbol)
-    try:
-        bal = await _bs_call(client, chain.blockscout_base, {"module": "account", "action": "balance", "address": address})
-        if bal.get("status") == "1":
-            try:
-                cd.balance = int(bal["result"]) / 1e18
-            except (TypeError, ValueError):
-                pass
-
-        txs = await _bs_call(client, chain.blockscout_base, {
-            "module": "account", "action": "txlist", "address": address,
-            "page": 1, "offset": 50, "sort": "desc",
-        })
-        if txs.get("status") == "1" and isinstance(txs.get("result"), list):
-            cd.tx_count = len(txs["result"])
-            cd.txs = [_normalize_tx(t, chain.slug) for t in txs["result"]]
-    except Exception as e:
-        cd.error = f"{type(e).__name__}: {str(e)[:120]}"
-    return cd
+    """LEGACY shim — delegates to the BlockscoutProvider in providers/."""
+    from .providers import get
+    p = get("blockscout")
+    if p is None:
+        cd = ChainData(chain=chain.slug, label=chain.label, symbol=chain.symbol, is_testnet=chain.is_testnet)
+        cd.error = "blockscout provider not registered"
+        return cd
+    return await p.fetch(client, chain, address)
 
 
 def _normalize_tx(t: dict, chain: str) -> dict:
@@ -167,27 +242,105 @@ def _normalize_tx(t: dict, chain: str) -> dict:
         "method": (t.get("functionName") or t.get("methodId") or "").split("(")[0],
         "is_error": str(t.get("isError", "0")) == "1",
         "gas_used": int(t.get("gasUsed", 0) or 0),
+        "gas_price": int(t.get("gasPrice", 0) or 0),
     }
 
 
-async def fetch_wallet_all_chains(address: str, chains: Iterable[Chain] = None) -> list[ChainData]:
+def _normalize_erc20(t: dict, chain: str) -> TokenTransfer:
+    """Etherscan tokentx shape: from, to, contractAddress, tokenSymbol,
+    tokenName, value (raw int), tokenDecimal, timeStamp, hash."""
+    try:
+        ts = int(t.get("timeStamp", 0) or 0)
+        decimals = int(t.get("tokenDecimal", 18) or 18)
+        raw = int(t.get("value", 0) or 0)
+        amount = raw / (10 ** decimals) if decimals else float(raw)
+    except (TypeError, ValueError):
+        ts, decimals, amount = 0, 18, 0.0
+    return TokenTransfer(
+        chain=chain,
+        ts=ts,
+        hash=t.get("hash", ""),
+        from_addr=(t.get("from") or "").lower(),
+        to_addr=(t.get("to") or "").lower(),
+        contract=(t.get("contractAddress") or "").lower(),
+        symbol=t.get("tokenSymbol", "")[:24],
+        name=t.get("tokenName", "")[:60],
+        amount=amount,
+        decimals=decimals,
+    )
+
+
+def _normalize_nft(t: dict, chain: str) -> NFTTransfer:
+    """Etherscan tokennfttx shape: from, to, contractAddress, tokenID,
+    tokenName, tokenSymbol, timeStamp, hash."""
+    try:
+        ts = int(t.get("timeStamp", 0) or 0)
+    except (TypeError, ValueError):
+        ts = 0
+    return NFTTransfer(
+        chain=chain,
+        ts=ts,
+        hash=t.get("hash", ""),
+        from_addr=(t.get("from") or "").lower(),
+        to_addr=(t.get("to") or "").lower(),
+        contract=(t.get("contractAddress") or "").lower(),
+        symbol=t.get("tokenSymbol", "")[:24],
+        name=t.get("tokenName", "")[:80],
+        token_id=str(t.get("tokenID", ""))[:32],
+    )
+
+
+async def fetch_wallet_all_chains(
+    address: str,
+    chains: Iterable[Chain] | None = None,
+) -> list[ChainData]:
+    """Parallel fetch across the chain registry.
+
+    Dispatches each chain to its registered provider (etherscan, blockscout,
+    future: berachain, starknet). Each provider handles its own errors —
+    one chain failing does not break the others.
+
+    `chains` defaults to ALL_CHAINS (mainnets + testnets). Pass a custom subset
+    for shallow scans or specific chain investigations.
+    """
+    from .providers import get as get_provider
+
     address = address.lower()
-    chains = list(chains) if chains is not None else CHAINS
-    key = _load_etherscan_key()
+    chains = list(chains) if chains is not None else ALL_CHAINS
     timeout = httpx.Timeout(25.0, connect=8.0)
+
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         tasks = []
         for c in chains:
-            if c.provider == "etherscan":
-                if not key:
-                    continue
-                tasks.append(_fetch_etherscan(client, c, address, key))
-            else:
-                tasks.append(_fetch_blockscout(client, c, address))
+            provider = get_provider(c.provider)
+            if provider is None:
+                # Unregistered provider — skip silently. Logged at debug so we
+                # can spot misconfigured chain rows.
+                log.debug("no provider registered for %s (slug=%s)", c.slug, c.provider)
+                continue
+            tasks.append(provider.fetch(client, c, address))
         results = await asyncio.gather(*tasks, return_exceptions=True)
+
     out: list[ChainData] = []
     for r in results:
         if isinstance(r, Exception):
+            log.debug("chain fetch raised: %s", r)
             continue
         out.append(r)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Provider auto-registration on first import. Order matters only for clarity.
+# ---------------------------------------------------------------------------
+def _install_default_providers() -> None:
+    from .providers.blockscout import install as install_bs
+    from .providers.etherscan import install as install_es
+    from .providers.routescan import install as install_rs
+
+    install_es(_load_etherscan_key)
+    install_bs()
+    install_rs()
+
+
+_install_default_providers()

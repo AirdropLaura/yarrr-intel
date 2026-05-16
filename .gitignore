@@ -40,3 +40,10 @@ htmlcov/
 # Misc
 .cache/
 .turbo/
+frontend/tsconfig.tsbuildinfo
+yarrr.db
+yarrr.db-shm
+yarrr.db-wal
+__pycache__/
+*.pyc
+

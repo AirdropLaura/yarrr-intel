@@ -1,16 +1,20 @@
-"""Wallet profiler — turn raw multichain tx history into a compact digest
-suitable for LLM analysis.
+"""Wallet profiler — Layer 2 of the Yarrr.Tech pipeline.
 
-Goal: reduce 250 raw transactions (verbose JSON) into ~600-1500 input tokens
-that capture the meaningful behavioral signal:
+Turns raw multichain tx history (Layer 1 output) into a structured behavioral
+intelligence digest. The digest is what the LLM analyst (Layer 3) reasons over
+— never raw transactions.
 
-- Activity timeline (oldest tx, latest tx, total tx, error rate)
-- Per-chain distribution
-- Top counterparty contracts (clustered by frequency, with classification)
-- Notable categories (bridges, NFTs, swaps, mints, faucets, lending)
-- Recent activity highlights (last 5-10 txs in plain English)
+Goal: compress hundreds of txs across 15+ chains into ~600-1500 prompt tokens
+that capture meaningful signal:
 
-Heuristic classification uses a curated lookup table of well-known protocol
+- Quantitative: tx counts, error rate, gas profile, age, dormancy
+- Distribution: per-chain mainnet/testnet split, chain hopping
+- Behavioral: activity categories, top counterparties, recent actions
+- Funding: heuristic source (CEX deposit / bridge inbound / claim)
+- Archetypes: scored candidate identities (airdrop_hunter, smart_money, ...)
+- Risk: revert rate, approval count, dormant→burst patterns
+
+Heuristic classification uses a curated lookup of well-known protocol
 contracts. Anything unknown is preserved as `unknown` so the LLM can reason
 about it from address + method name.
 """
@@ -20,12 +24,14 @@ import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
-from .chain import ChainData
+from .archetypes import Archetype, ArchetypeInputs, score_archetypes
+from .chain import ChainData, NFTTransfer, TokenTransfer
+from .reputation import ReputationScore, compute_reputation, reputation_to_prompt_lines
+from .tokens import is_lp_token, is_lst_token, is_stablecoin, looks_like_spam_nft
 
 # ---------------------------------------------------------------------------
-# Known protocol classification (curated, lowercase)
+# Known protocol classification (curated, lowercase address → (category, label))
 # ---------------------------------------------------------------------------
-# Format: { lowercase_address: (category, label) }
 KNOWN_CONTRACTS: dict[str, tuple[str, str]] = {
     # Bridges
     "0x3154cf16ccdb4c6d922629664174b904d80f2c35":  ("bridge", "Base Bridge"),
@@ -40,6 +46,7 @@ KNOWN_CONTRACTS: dict[str, tuple[str, str]] = {
     "0x1a44076050125825900e736c501f859c50fe728c":  ("bridge", "LayerZero Endpoint v2"),
     "0x3a23f943181408eac424116af7b7790c94cb97a5":  ("bridge", "Socket Gateway"),
     "0x3e19d726ed435afd3a42967551426b3a47c0f5b7":  ("bridge", "Stargate"),
+    "0x80c67432656d59144ceff962e8faf8926599bcf8":  ("bridge", "Orbiter Finance"),
     # DEX routers
     "0xe592427a0aece92de3edee1f18e0157c05861564":  ("dex", "Uniswap V3 Router"),
     "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45":  ("dex", "Uniswap V3 Router 2"),
@@ -51,10 +58,12 @@ KNOWN_CONTRACTS: dict[str, tuple[str, str]] = {
     "0x1111111254eeb25477b68fb85ed929f73a960582":  ("dex", "1inch v5 Router"),
     "0x111111125421ca6dc452d289314280a0f8842a65":  ("dex", "1inch v6 Router"),
     "0xdef1c0ded9bec7f1a1670819833240f027b25eff":  ("dex", "0x Exchange Proxy"),
+    "0x6131b5fae19ea4f9d964eac0408e4408b66337b5":  ("dex", "KyberSwap Aggregator"),
     # Lending
     "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2":  ("lending", "Aave v3 Pool"),
     "0xa17581a9e3356d9a858b789d68b4d866e593ae94":  ("lending", "Compound USDC"),
     "0x5d3a536e4d6dbd6114cc1ead35777bab948e3643":  ("lending", "Compound DAI"),
+    "0xe592427a0aece92de3edee1f18e0157c05861564":  ("dex", "Uniswap V3 Router"),
     # NFT marketplaces
     "0x00000000000000adc04c56bf30ac9d3c0aaf14dc":  ("nft", "Seaport (OpenSea)"),
     "0x0000000000000068f116a894984e2db1123eb395":  ("nft", "Seaport 1.6"),
@@ -82,6 +91,26 @@ METHOD_HINTS: list[tuple[tuple[str, ...], str]] = [
     (("vote", "castVote"),                         "governance"),
 ]
 
+# Known CEX deposit address fragments (matched by prefix on `from` field).
+# Used for funding source heuristic. Lowercase. Add more as we observe them.
+KNOWN_CEX_HOTWALLETS: dict[str, str] = {
+    "0x28c6c06298d514db089934071355e5743bf21d60": "Binance 14",
+    "0x21a31ee1afc51d94c2efccaa2092ad1028285549": "Binance 15",
+    "0xdfd5293d8e347dfe59e90efd55b2956a1343963d": "Binance 16",
+    "0xa910f92acdaf488fa6ef02174fb86208ad7722ba": "OKX",
+    "0x6cc5f688a315f3dc28a7781717a9a798a59fda7b": "OKX 2",
+    "0x46340b20830761efd32832a74d7169b29feb9758": "Crypto.com",
+    "0x77696bb39917c91a0c3908d577d5e322095425ca": "Coinbase",
+    "0x71660c4005ba85c37ccec55d0c4493e66fe775d3": "Coinbase 1",
+    "0x503828976d22510aad0201ac7ec88293211d23da": "Coinbase 2",
+    "0xddfabcdc4d8ffc6d5beaf154f18b778f892a0740": "Coinbase 3",
+    "0x3cd751e6b0078be393132286c442345e5dc49699": "Coinbase 4",
+    "0x6262998ced04146fa42253a5c0af90ca02dfd2a3": "Crypto.com 2",
+    "0xd24400ae8bfebb18ca49be86258a3c749cf46853": "Gemini",
+    "0xfdb16996831753d5331ff813c29a93c76834a0ad": "Bitfinex",
+    "0x59a5208b32e627891c389ebafc644145224006e8": "HitBTC",
+}
+
 
 def _classify_method(method: str) -> str | None:
     if not method:
@@ -94,22 +123,96 @@ def _classify_method(method: str) -> str | None:
 
 
 @dataclass
+class TokenSignals:
+    """Aggregated ERC20 + NFT activity signals across all chains."""
+    stablecoin_volume_usd: float = 0.0          # rough sum of stablecoin transfer amounts
+    stablecoin_chains: list[str] = field(default_factory=list)
+    distinct_stablecoins: list[str] = field(default_factory=list)
+    distinct_erc20: int = 0                      # # of unique non-stablecoin ERC20s seen
+    holds_lp_tokens: bool = False
+    holds_lst_tokens: bool = False
+    distinct_nft_collections: int = 0
+    spam_nft_count: int = 0
+    spam_nft_examples: list[str] = field(default_factory=list)
+
+
+@dataclass
+class TimelinePeriod:
+    """A behavioral phase in the wallet's life — derived by bucketing tx timestamps.
+
+    Buckets are uniform-width (count-based) so the visualization can show
+    relative activity intensity. Width on screen ∝ duration in seconds,
+    height/intensity ∝ tx count in the bucket.
+    """
+    start_ts: int
+    end_ts: int
+    tx_count: int
+    chains: list[str]              # distinct chains active in this period
+    dominant_category: str | None  # most common initiated category
+    error_rate: float
+
+
+@dataclass
+class FailedTxCluster:
+    """A failure pattern: ≥3 reverts to the same target on the same chain."""
+    chain: str
+    target: str          # counterparty address
+    method: str | None
+    count: int
+
+
+@dataclass
 class WalletDigest:
     address: str
+    name: str | None = None        # ENS / Basename if resolved
+
+    # Chain footprint
     chains_active: list[str] = field(default_factory=list)
     chains_dormant: list[str] = field(default_factory=list)
-    total_balance_eth_equiv: float = 0.0
+    mainnet_chains_active: list[str] = field(default_factory=list)
+    testnet_chains_active: list[str] = field(default_factory=list)
+
+    # Balances
+    total_balance_native: float = 0.0   # sum across mainnets only
     balances_by_chain: dict[str, float] = field(default_factory=dict)
+
+    # Tx volume
     total_txs: int = 0
     txs_by_chain: dict[str, int] = field(default_factory=dict)
     error_rate: float = 0.0
+
+    # Time signals
     first_tx_ts: int | None = None
     last_tx_ts: int | None = None
     days_active: int = 0
     days_since_last_tx: int | None = None
+    wallet_age_days: int = 0
+
+    # Behavior
     activity_categories: dict[str, int] = field(default_factory=dict)
     top_contracts: list[dict] = field(default_factory=list)
     recent_actions: list[str] = field(default_factory=list)
+
+    # Funding heuristic
+    funding_source: str | None = None      # "cex_deposit" | "bridge" | "airdrop_claim" | None
+    funding_evidence: list[str] = field(default_factory=list)
+
+    # Token signals (Phase 2a)
+    tokens: TokenSignals = field(default_factory=TokenSignals)
+
+    # Failed tx pattern analysis (Phase 2a)
+    failed_tx_clusters: list[FailedTxCluster] = field(default_factory=list)
+
+    # Timeline (Phase 2c) — bucketed activity periods for visualization
+    timeline: list[TimelinePeriod] = field(default_factory=list)
+
+    # Archetypes — primary intelligence output
+    archetypes: list[Archetype] = field(default_factory=list)
+
+    # Composite reputation (Phase 3.3) — derived AFTER archetypes are scored.
+    reputation: ReputationScore | None = None
+
+    # Heuristic flags (legacy, kept for backwards compat with frontend)
     flags: list[str] = field(default_factory=list)
 
 
@@ -126,6 +229,8 @@ def _format_recent(tx: dict, wallet_addr: str) -> str:
     if counterparty in KNOWN_CONTRACTS:
         category, label = KNOWN_CONTRACTS[counterparty]
         cat_lbl = f" {label}"
+    elif counterparty in KNOWN_CEX_HOTWALLETS:
+        cat_lbl = f" {KNOWN_CEX_HOTWALLETS[counterparty]} (CEX)"
     elif counterparty:
         cat_lbl = f" {counterparty[:8]}…{counterparty[-4:]}"
     err_marker = "  [REVERTED]" if tx.get("is_error") else ""
@@ -141,9 +246,206 @@ def _human_age(secs: int) -> str:
     return f"{secs // (365 * 86400)}y ago"
 
 
-def build_digest(address: str, all_chain_data: list[ChainData]) -> WalletDigest:
+def _infer_funding_source(all_txs: list[dict], wallet: str) -> tuple[str | None, list[str], dict | None]:
+    """Pick the earliest *inbound* tx that explains how the wallet got funded.
+
+    Order of preference: CEX hotwallet > bridge contract > airdrop claim.
+    Returns (source_tag, evidence_lines, raw_event). The raw_event dict is
+    used by the cluster module to index funding for sybil graph queries —
+    it contains: source_addr, chain, ts, tx_hash, value_eth.
+    """
+    inbound = [t for t in all_txs if (t.get("to") or "").lower() == wallet
+               and (t.get("from") or "").lower() != wallet
+               and not t.get("is_error")
+               and (t.get("value_eth") or 0) > 0]
+    inbound.sort(key=lambda t: t.get("ts") or 0)
+    for t in inbound[:5]:
+        sender = (t.get("from") or "").lower()
+        chain = t.get("chain", "?")
+        ts = t.get("ts") or 0
+        date = time.strftime("%Y-%m-%d", time.gmtime(ts)) if ts else "unknown"
+        raw = {
+            "source_addr": sender,
+            "chain": chain,
+            "ts": ts,
+            "tx_hash": t.get("hash"),
+            "value_eth": float(t.get("value_eth") or 0),
+        }
+        if sender in KNOWN_CEX_HOTWALLETS:
+            label = KNOWN_CEX_HOTWALLETS[sender]
+            raw["source_type"] = "cex"
+            return "cex_deposit", [f"first inbound from {label} on {chain} at {date}"], raw
+        if sender in KNOWN_CONTRACTS and KNOWN_CONTRACTS[sender][0] == "bridge":
+            label = KNOWN_CONTRACTS[sender][1]
+            raw["source_type"] = "bridge"
+            return "bridge", [f"first inbound from {label} on {chain} at {date}"], raw
+    # Outbound claim()?
+    for t in all_txs:
+        if (t.get("from") or "").lower() != wallet:
+            continue
+        method = (t.get("method") or "").lower()
+        if "claim" in method:
+            return "airdrop_claim", [f"earliest claim() to {t.get('to', '?')[:10]}… on {t.get('chain', '?')}"], None
+    return None, [], None
+
+
+def _analyze_tokens(all_chain_data: list[ChainData], wallet: str) -> TokenSignals:
+    """Aggregate ERC20 + NFT signals across primary mainnets.
+
+    Stablecoin volume is approximated by summing transfer amounts (in token
+    units, treating 1 stablecoin ≈ 1 USD). Good enough for "this wallet moved
+    tens of thousands of dollars in stablecoins" inference. Not exact.
+    """
+    sigs = TokenSignals()
+    sc_volume = 0.0
+    sc_chains: set[str] = set()
+    sc_symbols: set[str] = set()
+    erc20_contracts: set[str] = set()
+    lp_seen = False
+    lst_seen = False
+
+    nft_collections: set[str] = set()
+    spam_nfts: list[str] = []
+
+    for cd in all_chain_data:
+        if cd.is_testnet:
+            continue
+        for tx in cd.erc20_transfers:
+            sym = is_stablecoin(tx.contract)
+            if sym:
+                sc_volume += tx.amount
+                sc_chains.add(cd.chain)
+                sc_symbols.add(sym)
+            else:
+                erc20_contracts.add(tx.contract)
+                if is_lp_token(tx.symbol):
+                    lp_seen = True
+                if is_lst_token(tx.symbol):
+                    lst_seen = True
+
+        for nft in cd.nft_transfers:
+            nft_collections.add(f"{cd.chain}:{nft.contract}")
+            if looks_like_spam_nft(nft.name, nft.symbol):
+                if (nft.to_addr or "").lower() == wallet:
+                    label = nft.name or nft.symbol or nft.contract[:12]
+                    spam_nfts.append(label)
+
+    sigs.stablecoin_volume_usd = round(sc_volume, 2)
+    sigs.stablecoin_chains = sorted(sc_chains)
+    sigs.distinct_stablecoins = sorted(sc_symbols)
+    sigs.distinct_erc20 = len(erc20_contracts)
+    sigs.holds_lp_tokens = lp_seen
+    sigs.holds_lst_tokens = lst_seen
+    sigs.distinct_nft_collections = len(nft_collections)
+    sigs.spam_nft_count = len(spam_nfts)
+    # Trim to 5 examples — enough for evidence, doesn't blow up the prompt.
+    sigs.spam_nft_examples = list({s for s in spam_nfts})[:5]
+    return sigs
+
+
+def _failed_tx_clusters(all_txs: list[dict], wallet: str) -> list[FailedTxCluster]:
+    """Group reverted txs initiated by the wallet by (chain, target, method).
+
+    Surface only clusters of 3+ — single reverts are noise, but repeated
+    reverts to the same contract are meaningful (failed mints, slippage,
+    permit timing, etc.). The analyst can interpret.
+    """
+    buckets: dict[tuple[str, str, str], int] = {}
+    for tx in all_txs:
+        if not tx.get("is_error"):
+            continue
+        if (tx.get("from") or "").lower() != wallet:
+            continue
+        chain = tx.get("chain", "?")
+        target = (tx.get("to") or "").lower() or "(none)"
+        method = (tx.get("method") or "").lower() or "(transfer)"
+        key = (chain, target, method)
+        buckets[key] = buckets.get(key, 0) + 1
+
+    out: list[FailedTxCluster] = []
+    for (chain, target, method), n in sorted(buckets.items(), key=lambda kv: -kv[1]):
+        if n >= 3:
+            out.append(FailedTxCluster(
+                chain=chain,
+                target=target,
+                method=method if method != "(transfer)" else None,
+                count=n,
+            ))
+        if len(out) >= 5:
+            break
+    return out
+
+
+def _build_timeline(all_txs: list[dict], wallet: str, max_buckets: int = 10) -> list[TimelinePeriod]:
+    """Bucket the wallet's tx history into time-based periods for visualization.
+
+    Strategy:
+    - Sort all txs by timestamp ascending.
+    - Split into N equal-time buckets between first and last tx.
+    - For each bucket compute: tx_count, distinct chains, dominant category,
+      error rate.
+
+    Equal-time buckets (vs equal-count) are right for showing dormancy: if a
+    wallet was active in 2024 then dormant for 6 months then re-engaged, the
+    timeline shows the dormant gap as low-intensity buckets.
+    """
+    txs = [t for t in all_txs if t.get("ts")]
+    if len(txs) < 3:
+        return []
+
+    txs.sort(key=lambda t: t["ts"])
+    t_first = txs[0]["ts"]
+    t_last = txs[-1]["ts"]
+    if t_last <= t_first:
+        return []
+
+    span = t_last - t_first
+    n = min(max_buckets, max(3, len(txs) // 5))
+    bucket_size = max(span / n, 1)
+
+    buckets: list[list[dict]] = [[] for _ in range(n)]
+    for t in txs:
+        idx = min(int((t["ts"] - t_first) / bucket_size), n - 1)
+        buckets[idx].append(t)
+
+    out: list[TimelinePeriod] = []
+    for i, bucket in enumerate(buckets):
+        if not bucket:
+            # Skip empty buckets entirely — caller can render a gap from the
+            # boundary timestamps if desired.
+            continue
+        b_start = int(t_first + i * bucket_size)
+        b_end = int(t_first + (i + 1) * bucket_size)
+        chains = sorted({(t.get("chain") or "?") for t in bucket})
+        cat_counts: Counter[str] = Counter()
+        errors = 0
+        for t in bucket:
+            if t.get("is_error"):
+                errors += 1
+            if (t.get("from") or "").lower() != wallet:
+                continue
+            to = (t.get("to") or "").lower()
+            if to in KNOWN_CONTRACTS:
+                cat_counts[KNOWN_CONTRACTS[to][0]] += 1
+            else:
+                mc = _classify_method(t.get("method", ""))
+                if mc:
+                    cat_counts[mc] += 1
+        dominant = cat_counts.most_common(1)[0][0] if cat_counts else None
+        out.append(TimelinePeriod(
+            start_ts=b_start,
+            end_ts=b_end,
+            tx_count=len(bucket),
+            chains=chains,
+            dominant_category=dominant,
+            error_rate=round(errors / len(bucket), 3) if bucket else 0.0,
+        ))
+    return out
+
+
+def build_digest(address: str, all_chain_data: list[ChainData], name: str | None = None) -> WalletDigest:
     addr_lower = address.lower()
-    digest = WalletDigest(address=addr_lower)
+    digest = WalletDigest(address=addr_lower, name=name)
 
     all_txs: list[dict] = []
     contract_hits: Counter[str] = Counter()
@@ -155,18 +457,20 @@ def build_digest(address: str, all_chain_data: list[ChainData]) -> WalletDigest:
         digest.txs_by_chain[cd.chain] = cd.tx_count
         if cd.tx_count > 0 or cd.balance > 0:
             digest.chains_active.append(cd.chain)
+            if cd.is_testnet:
+                digest.testnet_chains_active.append(cd.chain)
+            else:
+                digest.mainnet_chains_active.append(cd.chain)
         else:
             digest.chains_dormant.append(cd.chain)
-        digest.total_balance_eth_equiv += cd.balance
+        if not cd.is_testnet:
+            digest.total_balance_native += cd.balance
         digest.total_txs += cd.tx_count
 
         for tx in cd.txs:
             all_txs.append(tx)
             if tx.get("is_error"):
                 error_total += 1
-            # Counterparty: when wallet is sender (`from`), counterparty is `to`.
-            # When wallet is receiver, counterparty is `from`. Either way, we
-            # never count the wallet's own address as a counterparty.
             tx_from = (tx.get("from") or "").lower()
             tx_to = (tx.get("to") or "").lower()
             if tx_from == addr_lower:
@@ -174,7 +478,7 @@ def build_digest(address: str, all_chain_data: list[ChainData]) -> WalletDigest:
             elif tx_to == addr_lower:
                 cp = tx_from
             else:
-                cp = tx_to  # internal/contract event
+                cp = tx_to
             if cp and cp != addr_lower and cp != "0x0000000000000000000000000000000000000000":
                 contract_hits[cp] += 1
                 contract_chain[cp].add(cd.chain)
@@ -190,6 +494,7 @@ def build_digest(address: str, all_chain_data: list[ChainData]) -> WalletDigest:
         span = digest.last_tx_ts - digest.first_tx_ts
         digest.days_active = max(span // 86400, 1)
         digest.days_since_last_tx = max(int(time.time()) - digest.last_tx_ts, 0) // 86400
+        digest.wallet_age_days = max((int(time.time()) - digest.first_tx_ts) // 86400, 1)
 
     # Top contracts
     top = contract_hits.most_common(15)
@@ -203,8 +508,7 @@ def build_digest(address: str, all_chain_data: list[ChainData]) -> WalletDigest:
             "chains": sorted(contract_chain[addr]),
         })
 
-    # Activity category histogram — only count txs the wallet INITIATED
-    # (incoming txs reflect what others did, not the wallet's behavior)
+    # Activity category histogram — only count txs the wallet INITIATED.
     cat_counter: Counter[str] = Counter()
     for tx in all_txs:
         tx_from = (tx.get("from") or "").lower()
@@ -218,7 +522,7 @@ def build_digest(address: str, all_chain_data: list[ChainData]) -> WalletDigest:
             if mc:
                 cat_counter[mc] += 1
             elif to:
-                cat_counter["contract_call"] += 1
+                cat_counter[ "contract_call"] += 1
             else:
                 cat_counter["contract_deploy"] += 1
     digest.activity_categories = dict(cat_counter.most_common())
@@ -227,7 +531,77 @@ def build_digest(address: str, all_chain_data: list[ChainData]) -> WalletDigest:
     sorted_txs = sorted(all_txs, key=lambda t: t.get("ts") or 0, reverse=True)
     digest.recent_actions = [_format_recent(t, addr_lower) for t in sorted_txs[:10]]
 
-    # Flags
+    # Funding source heuristic
+    src, ev, raw_funding = _infer_funding_source(all_txs, addr_lower)
+    digest.funding_source = src
+    digest.funding_evidence = ev
+
+    # Index the funding event for sybil graph clustering (Phase 3.4).
+    # We only record events with a high-signal source type — CEX hot wallets
+    # and bridge contracts — to keep the index targeted.
+    if raw_funding and raw_funding.get("source_type") in ("cex", "bridge"):
+        try:
+            from .cluster import FundingEvent, record_funding_event
+            record_funding_event(FundingEvent(
+                wallet=addr_lower,
+                source_addr=raw_funding["source_addr"],
+                source_type=raw_funding["source_type"],
+                chain=raw_funding["chain"],
+                ts=raw_funding["ts"],
+                tx_hash=raw_funding.get("tx_hash"),
+                value_eth=raw_funding.get("value_eth", 0.0),
+            ))
+        except Exception as e:
+            # Never let indexing block analysis.
+            log.debug("funding event indexing failed: %s", e)
+
+    # Token signals (Phase 2a) — ERC20 + NFT aggregates from primary mainnets.
+    digest.tokens = _analyze_tokens(all_chain_data, addr_lower)
+
+    # Failed tx clusters — repeated reverts to the same target are meaningful
+    # (failed mints, slippage on illiquid pools, permit2 timing issues).
+    digest.failed_tx_clusters = _failed_tx_clusters(all_txs, addr_lower)
+
+    # Timeline — bucketed activity periods for the analyst + frontend.
+    digest.timeline = _build_timeline(all_txs, addr_lower)
+
+    # ----- Archetype scoring -------------------------------------------------
+    inputs = ArchetypeInputs(
+        total_txs=digest.total_txs,
+        days_active=digest.days_active,
+        days_since_last_tx=digest.days_since_last_tx,
+        error_rate=digest.error_rate,
+        chains_active=digest.chains_active,
+        chains_dormant=digest.chains_dormant,
+        testnet_chains_active=digest.testnet_chains_active,
+        mainnet_chains_active=digest.mainnet_chains_active,
+        activity_categories=digest.activity_categories,
+        top_contracts=digest.top_contracts,
+        bridge_events=cat_counter.get("bridge", 0),
+        nft_events=cat_counter.get("nft", 0),
+        swap_events=cat_counter.get("swap", 0) + cat_counter.get("dex", 0),
+        approval_events=cat_counter.get("approval", 0),
+        mint_events=cat_counter.get("nft_mint", 0),
+        governance_events=cat_counter.get("governance", 0),
+        stake_events=cat_counter.get("stake", 0),
+        total_balance_native=digest.total_balance_native,
+        funding_hint=digest.funding_source,
+        wallet_age_days=digest.wallet_age_days,
+        stablecoin_volume_usd=digest.tokens.stablecoin_volume_usd,
+        distinct_stablecoins=len(digest.tokens.distinct_stablecoins),
+        holds_lp_tokens=digest.tokens.holds_lp_tokens,
+        holds_lst_tokens=digest.tokens.holds_lst_tokens,
+        distinct_nft_collections=digest.tokens.distinct_nft_collections,
+        spam_nft_count=digest.tokens.spam_nft_count,
+        failed_tx_cluster_count=len(digest.failed_tx_clusters),
+    )
+    digest.archetypes = score_archetypes(inputs)
+
+    # ----- Composite reputation score (Phase 3.3) ----------------------------
+    # Computed AFTER archetypes since it depends on them.
+    digest.reputation = compute_reputation(digest)
+
+    # ----- Legacy flags (compat with existing frontend) ----------------------
     if digest.total_txs == 0:
         digest.flags.append("no_activity")
     if digest.error_rate > 0.15:
@@ -244,37 +618,69 @@ def build_digest(address: str, all_chain_data: list[ChainData]) -> WalletDigest:
         digest.flags.append(f"dormant({digest.days_since_last_tx}d)")
     if len(digest.chains_active) >= 4:
         digest.flags.append("multi_chain")
+    if digest.testnet_chains_active:
+        digest.flags.append(f"testnet_active({len(digest.testnet_chains_active)})")
 
     return digest
 
 
 def digest_to_prompt_block(digest: WalletDigest) -> str:
-    """Render the digest as a compact markdown block ready to send to the LLM."""
+    """Render the digest as a compact markdown block ready to send to the LLM.
+
+    The shape here is deliberately consistent: stable headings, minimal noise,
+    facts only. The analyst prompt is tuned against this exact structure.
+    """
     lines: list[str] = []
-    lines.append(f"WALLET: `{digest.address}`")
+    name_line = f" ({digest.name})" if digest.name else ""
+    lines.append(f"WALLET: `{digest.address}`{name_line}")
     lines.append("")
+
+    # Activity overview
     lines.append("### Activity overview")
-    lines.append(f"- total transactions seen (last 50/chain): {digest.total_txs}")
+    lines.append(f"- total transactions sampled: {digest.total_txs}")
     lines.append(f"- error / revert rate: {digest.error_rate*100:.1f}%")
     if digest.first_tx_ts and digest.last_tx_ts:
         lines.append(f"- first observed tx: {time.strftime('%Y-%m-%d', time.gmtime(digest.first_tx_ts))}")
         lines.append(f"- latest tx: {time.strftime('%Y-%m-%d', time.gmtime(digest.last_tx_ts))} ({digest.days_since_last_tx}d ago)")
-        lines.append(f"- active span (within sampled tx): ~{digest.days_active}d")
-    lines.append(f"- chains active: {', '.join(digest.chains_active) or 'none'}")
+        lines.append(f"- wallet age: ~{digest.wallet_age_days}d (active span ~{digest.days_active}d within sample)")
+    lines.append(f"- mainnets active ({len(digest.mainnet_chains_active)}): {', '.join(digest.mainnet_chains_active) or 'none'}")
+    lines.append(f"- testnets active ({len(digest.testnet_chains_active)}): {', '.join(digest.testnet_chains_active) or 'none'}")
     if digest.chains_dormant:
-        lines.append(f"- chains dormant: {', '.join(digest.chains_dormant)}")
+        # Keep this list short — LLM doesn't need to see 12 dormant chains.
+        dormant = digest.chains_dormant[:8]
+        suffix = f" (+{len(digest.chains_dormant) - len(dormant)} more)" if len(digest.chains_dormant) > len(dormant) else ""
+        lines.append(f"- chains dormant/empty: {', '.join(dormant)}{suffix}")
     lines.append("")
-    lines.append("### Native balances")
+
+    # Funding source — high-signal lead for the analyst
+    if digest.funding_source:
+        lines.append("### Funding source (heuristic)")
+        lines.append(f"- inferred origin: {digest.funding_source}")
+        for e in digest.funding_evidence:
+            lines.append(f"  · {e}")
+        lines.append("")
+
+    # Native balances (mainnets only — testnet ETH is meaningless)
+    lines.append("### Native balances (mainnets)")
+    has_balance = False
     for chain, bal in digest.balances_by_chain.items():
-        lines.append(f"- {chain}: {bal:.4f}")
+        if bal > 0 and chain in digest.mainnet_chains_active:
+            lines.append(f"- {chain}: {bal:.4f}")
+            has_balance = True
+    if not has_balance:
+        lines.append("- (zero / dust on all sampled mainnets)")
     lines.append("")
-    lines.append("### Activity categories")
+
+    # Activity categories
+    lines.append("### Activity categories (initiated by wallet)")
     if digest.activity_categories:
         for cat, n in digest.activity_categories.items():
             lines.append(f"- {cat}: {n}")
     else:
-        lines.append("- (no classifiable activity)")
+        lines.append("- (no classifiable initiated activity)")
     lines.append("")
+
+    # Top counterparties
     lines.append("### Top counterparty contracts")
     if digest.top_contracts:
         for c in digest.top_contracts[:10]:
@@ -283,11 +689,76 @@ def digest_to_prompt_block(digest: WalletDigest) -> str:
     else:
         lines.append("- (none)")
     lines.append("")
+
+    # Token signals (Phase 2a) — only render if there's anything worth saying
+    if digest.tokens.distinct_erc20 or digest.tokens.stablecoin_volume_usd or digest.tokens.distinct_nft_collections:
+        lines.append("### Token activity (primary mainnets)")
+        if digest.tokens.stablecoin_volume_usd > 0:
+            stables = ", ".join(digest.tokens.distinct_stablecoins) or "stablecoins"
+            chains = ", ".join(digest.tokens.stablecoin_chains)
+            lines.append(f"- stablecoin transfers sampled: ~${digest.tokens.stablecoin_volume_usd:,.0f} ({stables}) on [{chains}]")
+        if digest.tokens.distinct_erc20:
+            lines.append(f"- distinct non-stable ERC20 contracts touched: {digest.tokens.distinct_erc20}")
+        if digest.tokens.holds_lp_tokens:
+            lines.append("- holds / has held LP receipt tokens (Uniswap V2/V3, etc.)")
+        if digest.tokens.holds_lst_tokens:
+            lines.append("- holds / has held liquid staking tokens (stETH/rETH/cbETH/etc.)")
+        if digest.tokens.distinct_nft_collections:
+            lines.append(f"- distinct NFT collections seen: {digest.tokens.distinct_nft_collections}")
+        if digest.tokens.spam_nft_count:
+            examples = ", ".join(f'"{x}"' for x in digest.tokens.spam_nft_examples[:3])
+            lines.append(f"- spam NFT drops received: {digest.tokens.spam_nft_count} ({examples})")
+        lines.append("")
+
+    # Failed tx clusters (Phase 2a)
+    if digest.failed_tx_clusters:
+        lines.append("### Repeated revert patterns")
+        for fc in digest.failed_tx_clusters:
+            method_part = f" via `{fc.method}`" if fc.method else ""
+            short_target = f"{fc.target[:10]}…{fc.target[-4:]}" if len(fc.target) > 14 else fc.target
+            lines.append(f"- {fc.count}× revert on {fc.chain}{method_part} → `{short_target}`")
+        lines.append("")
+
+    # Archetypes — the headline behavioral output
+    lines.append("### Heuristic archetype candidates (with confidence)")
+    if digest.archetypes:
+        for a in digest.archetypes:
+            lines.append(f"- **{a.name}** · {a.bucket} ({a.confidence:.2f})")
+            for ev in a.evidence:
+                lines.append(f"  · {ev}")
+    else:
+        lines.append("- (no archetype signal strong enough)")
+    lines.append("")
+
+    # Recent actions
     lines.append("### Recent actions")
     for action in digest.recent_actions:
         lines.append(f"- {action}")
     lines.append("")
-    lines.append("### Behavioral flags (heuristic)")
+
+    # Timeline (Phase 2c) — gives the analyst structured phase data so it can
+    # describe evolution without making numbers up. We render compactly: each
+    # bucket as a single line so the model sees the trend at a glance.
+    if digest.timeline:
+        lines.append("### Activity timeline (chronological buckets)")
+        for tp in digest.timeline:
+            start = time.strftime("%Y-%m-%d", time.gmtime(tp.start_ts))
+            end = time.strftime("%Y-%m-%d", time.gmtime(tp.end_ts))
+            chain_part = ",".join(tp.chains[:4])
+            if len(tp.chains) > 4:
+                chain_part += f"+{len(tp.chains) - 4}"
+            cat_part = f" · {tp.dominant_category}" if tp.dominant_category else ""
+            err_part = f" · err {tp.error_rate*100:.0f}%" if tp.error_rate >= 0.1 else ""
+            lines.append(f"- {start} → {end}: {tp.tx_count} tx on [{chain_part}]{cat_part}{err_part}")
+        lines.append("")
+
+    # Reputation score (Phase 3.3) — surfaced to the analyst with full
+    # transparency. The model can reference the number AND the contributions.
+    if digest.reputation:
+        lines.extend(reputation_to_prompt_lines(digest.reputation))
+
+    # Legacy flag list
+    lines.append("### Misc heuristic flags")
     if digest.flags:
         for f in digest.flags:
             lines.append(f"- {f}")
