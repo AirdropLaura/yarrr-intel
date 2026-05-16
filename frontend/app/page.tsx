@@ -365,8 +365,16 @@ export default function Home() {
       {/* About / intro — short positioning + builder credit */}
       <section className="relative max-w-3xl mx-auto px-6 mb-10">
         <div className="glass rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row gap-4 items-start">
-          <div className="shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-gold-400/20 to-gold-600/10 border border-gold-400/30 grid place-items-center text-gold-400 font-bold text-lg">
-            Y
+          <div className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 border-gold-400/40 ring-2 ring-gold-400/10 shadow-lg shadow-gold-400/10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/bastiar-avatar.jpg"
+              alt="Bastiar — yarrr-node.com"
+              width={56}
+              height={56}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-mono uppercase tracking-wider text-gold-400">
