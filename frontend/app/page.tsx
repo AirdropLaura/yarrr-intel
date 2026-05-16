@@ -142,8 +142,8 @@ const CHAIN_COLORS: Record<string, string> = {
 
 // Confidence bucket → border + text styles for archetype cards.
 const BUCKET_STYLES: Record<ArchetypeOut['bucket'], string> = {
-  strong:    'border-gold-400/60 bg-gold-400/10 text-gold-400',
-  moderate:  'border-gold-400/30 bg-gold-400/5 text-gold-400/90',
+  strong:    'border-ruby-400/60 bg-ruby-400/10 text-ruby-400',
+  moderate:  'border-ruby-400/30 bg-ruby-400/5 text-ruby-400/90',
   tentative: 'border-ink-700 bg-ink-800/60 text-ink-200',
   weak:      'border-ink-700/50 bg-ink-800/40 text-ink-400',
 };
@@ -329,16 +329,24 @@ export default function Home() {
 
   return (
     <main className="relative">
-      <div className="grid-bg fixed inset-0 pointer-events-none opacity-40" />
+      {/* Subtle ruby grid background — scrolls with content for cohesion */}
+      <div className="grid-bg fixed inset-0 pointer-events-none opacity-30" />
 
-      <header className="relative max-w-6xl mx-auto px-6 pt-12 pb-8 flex items-center justify-between">
+      <header className="relative max-w-6xl mx-auto px-6 pt-10 pb-8 flex items-center justify-between animate-fade-in">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 grid place-items-center font-bold text-ink-900 text-lg shadow-lg shadow-gold-400/20">
-            Y
+          {/* Brand mark — small ruby gem with avatar */}
+          <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-ruby-700/60 shadow-ruby-glow">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/bastiar-avatar.jpg" alt="" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 ring-1 ring-inset ring-ruby-400/20 rounded-xl pointer-events-none" />
           </div>
           <div>
-            <h1 className="font-bold tracking-tight">Yarrr<span className="text-gold-400">.</span>Tech</h1>
-            <p className="text-xs text-ink-400 font-mono">{t.taglineVersion}</p>
+            <h1 className="font-display text-lg font-semibold tracking-wide leading-none">
+              <span className="text-ink-50">Yarrr</span>
+              <span className="text-ruby-400">.</span>
+              <span className="text-ink-50">Tech</span>
+            </h1>
+            <p className="text-[10px] text-ink-500 font-mono uppercase tracking-[0.18em] mt-1">{t.taglineVersion}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -350,14 +358,20 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="relative max-w-3xl mx-auto px-6 pt-8 pb-10 text-center">
-        <span className="inline-block px-3 py-1 text-[11px] font-mono font-semibold uppercase tracking-wider text-gold-400 border border-gold-400/30 rounded-full bg-gold-400/5">
+      <section className="relative max-w-3xl mx-auto px-6 pt-8 pb-12 text-center">
+        {/* Soft hero glow behind title — adds depth without being loud */}
+        <div className="absolute inset-x-0 top-0 h-72 hero-glow pointer-events-none" />
+
+        <span className="ruby-chip animate-fade-in">
+          <span className="w-1.5 h-1.5 rounded-full bg-ruby-400 animate-subtle-pulse" />
           {t.betaBadge}
         </span>
-        <h2 className="mt-5 text-4xl sm:text-5xl font-bold leading-tight tracking-tight bg-gradient-to-br from-ink-50 to-gold-400 bg-clip-text text-transparent">
+
+        <h2 className="relative mt-6 text-4xl sm:text-5xl md:text-6xl font-display font-semibold leading-[1.05] tracking-tight gradient-text-ruby animate-fade-in-up">
           {t.heroTitleA}<br className="hidden sm:block" /> {t.heroTitleB}
         </h2>
-        <p className="mt-4 text-ink-300 max-w-xl mx-auto">
+
+        <p className="relative mt-5 text-ink-300 max-w-xl mx-auto leading-relaxed animate-fade-in-up-d2">
           {t.heroSub}
         </p>
       </section>
@@ -365,7 +379,7 @@ export default function Home() {
       {/* About / intro — short positioning + builder credit */}
       <section className="relative max-w-3xl mx-auto px-6 mb-10">
         <div className="glass rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row gap-4 items-start">
-          <div className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 border-gold-400/40 ring-2 ring-gold-400/10 shadow-lg shadow-gold-400/10">
+          <div className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 border-ruby-400/40 ring-2 ring-ruby-400/10 shadow-lg shadow-ruby-400/10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/bastiar-avatar.jpg"
@@ -377,7 +391,7 @@ export default function Home() {
             />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-mono uppercase tracking-wider text-gold-400">
+            <h3 className="text-sm font-mono uppercase tracking-wider text-ruby-400">
               {t.introHeading}
             </h3>
             <p className="mt-2 text-sm text-ink-200 leading-relaxed">
@@ -385,22 +399,20 @@ export default function Home() {
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-mono text-ink-400">
               <span>{t.builtBy}</span>
-              <span className="px-2 py-0.5 rounded-full bg-gold-400/10 border border-gold-400/30 text-gold-400 font-semibold">
+              <span className="px-2 py-0.5 rounded-full bg-ruby-500/10 border border-ruby-500/30 text-ruby-300 font-semibold">
                 {t.builtByName}
               </span>
               <span className="text-ink-500">· {t.builtByRole}</span>
               <a
-                href="https://t.me/Yarrr23"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-400/30 text-sky-300 hover:text-sky-200 hover:bg-sky-500/20 hover:border-sky-400/50 transition-colors"
-                aria-label="Telegram @Yarrr23"
-                title="Telegram @Yarrr23"
+                href="tg://user?id=7190034352"
+                className="group inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-ruby-950/40 border border-ruby-800/50 text-ruby-300 hover:text-ruby-200 hover:bg-ruby-900/50 hover:border-ruby-600/60 transition-all duration-300"
+                aria-label="Contact via Telegram"
+                title="Telegram ID: 7190034352"
               >
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <svg className="w-3 h-3 transition-transform duration-300 group-hover:scale-110" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
                 </svg>
-                <span>@Yarrr23</span>
+                <span>Telegram</span>
               </a>
             </div>
           </div>
@@ -408,7 +420,7 @@ export default function Home() {
       </section>
 
       <section className="relative max-w-3xl mx-auto px-6">
-        <div className="glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-gold-400/5">
+        <div className="glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-ruby-400/5">
           {/* Mode toggle: single vs multi-address */}
           <div className="mb-3 inline-flex rounded-full border border-ink-700/60 bg-ink-800/40 p-1">
             <button
@@ -416,7 +428,7 @@ export default function Home() {
               onClick={() => { setMode('single'); setError(null); }}
               className={`px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider transition-colors ${
                 mode === 'single'
-                  ? 'bg-gold-400/20 text-gold-400'
+                  ? 'bg-ruby-400/20 text-ruby-400'
                   : 'text-ink-400 hover:text-ink-200'
               }`}
             >
@@ -427,7 +439,7 @@ export default function Home() {
               onClick={() => { setMode('multi'); setError(null); }}
               className={`px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider transition-colors ${
                 mode === 'multi'
-                  ? 'bg-gold-400/20 text-gold-400'
+                  ? 'bg-ruby-400/20 text-ruby-400'
                   : 'text-ink-400 hover:text-ink-200'
               }`}
             >
@@ -487,23 +499,23 @@ export default function Home() {
                 type="button"
                 onClick={() => analyze(ex.address)}
                 disabled={loading}
-                className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-ink-800/60 border border-ink-700/60 text-xs font-mono hover:border-gold-400/40 hover:text-gold-400 transition-colors disabled:opacity-50"
+                className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-ink-800/60 border border-ink-700/60 text-xs font-mono hover:border-ruby-400/40 hover:text-ruby-400 transition-colors disabled:opacity-50"
               >
                 <span className="font-semibold">{ex.label}</span>
-                <span className="text-ink-500 group-hover:text-gold-400/70">· {t[ex.hintKey]}</span>
+                <span className="text-ink-500 group-hover:text-ruby-400/70">· {t[ex.hintKey]}</span>
               </button>
             ))}
           </div>
 
           {phase === 'fetching' && (
             <div className="mt-4 flex items-center gap-2 text-xs font-mono text-ink-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-gold-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-ruby-400 animate-pulse" />
               {t.scanning}
             </div>
           )}
           {phase === 'analyzing' && (
-            <div className="mt-4 flex items-center gap-2 text-xs font-mono text-gold-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-gold-400 animate-glow" />
+            <div className="mt-4 flex items-center gap-2 text-xs font-mono text-ruby-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-ruby-400 animate-glow" />
               {t.interpreting}
             </div>
           )}
@@ -523,9 +535,9 @@ export default function Home() {
         {digest && <DigestPanel digest={digest} />}
 
         {(output || phase === 'analyzing') && (
-          <article className="mt-6 glass rounded-2xl p-6 sm:p-8 shadow-2xl shadow-gold-400/5">
+          <article className="mt-6 glass rounded-2xl p-6 sm:p-8 shadow-2xl shadow-ruby-400/5">
             <header className="flex items-center justify-between mb-4 pb-3 border-b border-ink-700/60 gap-3">
-              <h3 className="font-mono text-sm uppercase tracking-wider text-gold-400">{t.walletIntel}</h3>
+              <h3 className="font-mono text-sm uppercase tracking-wider text-ruby-400">{t.walletIntel}</h3>
               {phase === 'done' && address && output && (
                 <ShareButton address={address} lang={lang} model="mimo-v2.5" analysis={output} />
               )}
@@ -535,7 +547,7 @@ export default function Home() {
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{output}</ReactMarkdown>
               ) : (
                 <div className="flex items-center gap-2 text-ink-400 text-sm">
-                  <span className="w-2 h-2 rounded-full bg-gold-400 animate-glow" />
+                  <span className="w-2 h-2 rounded-full bg-ruby-400 animate-glow" />
                   {t.reasoning}
                 </div>
               )}
@@ -565,11 +577,41 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="relative max-w-6xl mx-auto px-6 pt-20 pb-10 text-center">
-        <div className="text-xs text-ink-500 font-mono">
-          yarrr-node.com · {t.builtBy}{' '}
-          <span className="text-gold-400/80">{t.builtByName}</span>
-          {' · '}{t.footerBuilt}
+      <footer className="relative max-w-6xl mx-auto px-6 pt-24 pb-12">
+        {/* Subtle hairline divider with center fade */}
+        <div className="mb-8 h-px w-full bg-gradient-to-r from-transparent via-ruby-800/40 to-transparent" />
+
+        <div className="flex flex-col items-center gap-3 text-center">
+          {/* Wordmark */}
+          <div className="flex items-baseline gap-1.5 font-display text-base tracking-wide">
+            <span className="text-ink-200">yarrr</span>
+            <span className="text-ruby-400">.</span>
+            <span className="text-ink-200">tech</span>
+          </div>
+
+          {/* Tagline + builder credit */}
+          <div className="text-[11px] font-mono uppercase tracking-[0.2em] text-ink-500">
+            <span>{t.builtBy}</span>{' '}
+            <span className="text-ruby-300">{t.builtByName}</span>
+          </div>
+
+          {/* Telegram contact — single, clean, premium */}
+          <a
+            href="tg://user?id=7190034352"
+            className="group mt-1 inline-flex items-center gap-2 rounded-full px-3 py-1.5
+                       bg-ruby-950/50 border border-ruby-800/40
+                       text-[11px] font-mono text-ruby-300
+                       hover:text-ruby-200 hover:border-ruby-600/60 hover:bg-ruby-900/50
+                       transition-all duration-300"
+            aria-label="Contact via Telegram"
+            title="Telegram ID: 7190034352"
+          >
+            <svg className="w-3 h-3 transition-transform duration-300 group-hover:scale-110"
+                 viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
+            </svg>
+            <span>Telegram · 7190034352</span>
+          </a>
         </div>
       </footer>
     </main>
@@ -596,9 +638,9 @@ function TimelinePanel({ digest }: { digest: Digest }) {
   }
 
   return (
-    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-gold-400/5">
+    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-ruby-400/5">
       <header className="flex items-center justify-between mb-4 pb-3 border-b border-ink-700/60 gap-3">
-        <h3 className="font-mono text-sm uppercase tracking-wider text-gold-400">{t.timelineTitle}</h3>
+        <h3 className="font-mono text-sm uppercase tracking-wider text-ruby-400">{t.timelineTitle}</h3>
         <span className="text-[10px] font-mono text-ink-500">
           {fmtDate(tl[0].start_ts)} → {fmtDate(tl[tl.length - 1].end_ts)}
         </span>
@@ -618,9 +660,9 @@ function TimelinePanel({ digest }: { digest: Digest }) {
               p.error_rate >= 0.2
                 ? 'bg-red-400/40 border-red-400/60 hover:bg-red-400/60'
                 : p.dominant_category === 'bridge'
-                ? 'bg-gold-400/40 border-gold-400/70 hover:bg-gold-400/70'
+                ? 'bg-ruby-400/40 border-ruby-400/70 hover:bg-ruby-400/70'
                 : p.dominant_category === 'swap' || p.dominant_category === 'dex'
-                ? 'bg-gold-400/30 border-gold-400/50 hover:bg-gold-400/50'
+                ? 'bg-ruby-400/30 border-ruby-400/50 hover:bg-ruby-400/50'
                 : 'bg-ink-500/40 border-ink-500/60 hover:bg-ink-500/60';
             return (
               <div
@@ -651,11 +693,11 @@ function TimelinePanel({ digest }: { digest: Digest }) {
       {/* Legend */}
       <div className="flex flex-wrap gap-3 mt-3 text-[10px] font-mono text-ink-400">
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-gold-400/40 border border-gold-400/70" />
+          <span className="w-3 h-3 rounded-sm bg-ruby-400/40 border border-ruby-400/70" />
           {t.timelineLegendBridge}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-gold-400/30 border border-gold-400/50" />
+          <span className="w-3 h-3 rounded-sm bg-ruby-400/30 border border-ruby-400/50" />
           {t.timelineLegendDex}
         </span>
         <span className="flex items-center gap-1.5">
@@ -689,11 +731,11 @@ function TokensPanel({ digest }: { digest: Digest }) {
   if (!hasTokenSignal && fc.length === 0) return null;
 
   return (
-    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-gold-400/5 space-y-5">
+    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-ruby-400/5 space-y-5">
       {hasTokenSignal && (
         <section>
           <header className="flex items-center justify-between mb-3 pb-2 border-b border-ink-700/60">
-            <h3 className="font-mono text-sm uppercase tracking-wider text-gold-400">{t.tokensTitle}</h3>
+            <h3 className="font-mono text-sm uppercase tracking-wider text-ruby-400">{t.tokensTitle}</h3>
           </header>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-3">
@@ -723,12 +765,12 @@ function TokensPanel({ digest }: { digest: Digest }) {
           {(tk.holds_lp_tokens || tk.holds_lst_tokens) && (
             <div className="flex flex-wrap gap-1.5 mb-3">
               {tk.holds_lp_tokens && (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-gold-400/10 border border-gold-400/30 text-gold-400">
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-ruby-400/10 border border-ruby-400/30 text-ruby-400">
                   {t.tokensLP}
                 </span>
               )}
               {tk.holds_lst_tokens && (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-gold-400/10 border border-gold-400/30 text-gold-400">
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-ruby-400/10 border border-ruby-400/30 text-ruby-400">
                   {t.tokensLST}
                 </span>
               )}
@@ -753,7 +795,7 @@ function TokensPanel({ digest }: { digest: Digest }) {
       {fc.length > 0 && (
         <section>
           <header className="flex items-center justify-between mb-2 pb-2 border-b border-ink-700/60">
-            <h3 className="font-mono text-sm uppercase tracking-wider text-gold-400">{t.failedClustersTitle}</h3>
+            <h3 className="font-mono text-sm uppercase tracking-wider text-ruby-400">{t.failedClustersTitle}</h3>
             <span className="text-[10px] font-mono text-ink-500">{fc.length}</span>
           </header>
           <p className="text-[11px] text-ink-400 mb-3 leading-relaxed">{t.failedClustersHint}</p>
@@ -796,7 +838,7 @@ function TokenStat({
   return (
     <div className="px-3 py-2 rounded-lg bg-ink-800/60 border border-ink-700/60">
       <div className="text-[10px] font-mono uppercase tracking-wider text-ink-500">{label}</div>
-      <div className={`text-sm font-mono mt-0.5 ${tone === 'warn' ? 'text-red-300' : 'text-gold-400'}`}>{value}</div>
+      <div className={`text-sm font-mono mt-0.5 ${tone === 'warn' ? 'text-red-300' : 'text-ruby-400'}`}>{value}</div>
       {hint && <div className="text-[10px] font-mono text-ink-500 mt-0.5 truncate">{hint}</div>}
     </div>
   );
@@ -839,16 +881,16 @@ function ClusterPanel({ address }: { address: string }) {
   function shortAddr(a: string) { return `${a.slice(0, 6)}…${a.slice(-4)}`; }
 
   return (
-    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-gold-400/5">
+    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-ruby-400/5">
       <header className="flex items-center justify-between mb-4 pb-3 border-b border-ink-700/60 gap-3">
-        <h3 className="font-mono text-sm uppercase tracking-wider text-gold-400">{t.clusterTitle}</h3>
+        <h3 className="font-mono text-sm uppercase tracking-wider text-ruby-400">{t.clusterTitle}</h3>
         <span className="text-[10px] font-mono text-ink-500">{t.clusterSubtitle}</span>
       </header>
 
       <div className="flex flex-wrap gap-4 mb-4 text-xs">
         <div>
           <SectionLabel>{t.clusterSiblings}</SectionLabel>
-          <div className="font-mono text-2xl text-gold-400 font-bold">{report.distinct_wallets}</div>
+          <div className="font-mono text-2xl text-ruby-400 font-bold">{report.distinct_wallets}</div>
         </div>
         <div>
           <SectionLabel>{t.clusterSources}</SectionLabel>
@@ -867,7 +909,7 @@ function ClusterPanel({ address }: { address: string }) {
             <div className="flex items-center gap-2 shrink-0 text-[10px] font-mono">
               <span className={`px-2 py-0.5 rounded-full ${
                 m.source_type === 'cex'
-                  ? 'bg-gold-400/10 text-gold-400 border border-gold-400/30'
+                  ? 'bg-ruby-400/10 text-ruby-400 border border-ruby-400/30'
                   : 'bg-ink-700/40 text-ink-300 border border-ink-600/40'
               }`}>
                 {m.source_type}
@@ -893,8 +935,8 @@ function ReputationPanel({ digest }: { digest: Digest }) {
 
   // Bucket → color + label localization
   const bucketColors: Record<Reputation['bucket'], string> = {
-    high: 'text-gold-400 border-gold-400/60 bg-gold-400/10',
-    good: 'text-gold-500 border-gold-500/50 bg-gold-500/10',
+    high: 'text-ruby-400 border-ruby-400/60 bg-ruby-400/10',
+    good: 'text-ruby-500 border-ruby-500/50 bg-ruby-500/10',
     neutral: 'text-ink-200 border-ink-500/50 bg-ink-700/40',
     low: 'text-ink-400 border-ink-500/40 bg-ink-800/40',
     poor: 'text-red-400 border-red-400/40 bg-red-400/10',
@@ -930,9 +972,9 @@ function ReputationPanel({ digest }: { digest: Digest }) {
       : '#f87171';
 
   return (
-    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-gold-400/5">
+    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-ruby-400/5">
       <header className="flex items-center justify-between mb-4 pb-3 border-b border-ink-700/60 gap-3">
-        <h3 className="font-mono text-sm uppercase tracking-wider text-gold-400">{t.reputationTitle}</h3>
+        <h3 className="font-mono text-sm uppercase tracking-wider text-ruby-400">{t.reputationTitle}</h3>
         <span className="text-[10px] font-mono text-ink-500">{t.reputationSubtitle}</span>
       </header>
 
@@ -1007,7 +1049,7 @@ function ReputationPanel({ digest }: { digest: Digest }) {
                     </span>
                     <span
                       className={`font-mono font-semibold ${
-                        c.delta > 0 ? 'text-gold-400' : 'text-red-400'
+                        c.delta > 0 ? 'text-ruby-400' : 'text-red-400'
                       }`}
                     >
                       {c.delta > 0 ? '+' : ''}
@@ -1027,9 +1069,9 @@ function ReputationPanel({ digest }: { digest: Digest }) {
 function ArchetypePanel({ digest }: { digest: Digest }) {
   const { t } = useLang();
   return (
-    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-gold-400/5">
+    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-ruby-400/5">
       <header className="flex items-center justify-between mb-4 pb-3 border-b border-ink-700/60 gap-3">
-        <h3 className="font-mono text-sm uppercase tracking-wider text-gold-400">{t.archetypeTitle}</h3>
+        <h3 className="font-mono text-sm uppercase tracking-wider text-ruby-400">{t.archetypeTitle}</h3>
         <div className="flex flex-col items-end min-w-0">
           {digest.name && (
             <span className="text-sm font-semibold text-ink-50 truncate max-w-[14rem]">
@@ -1079,7 +1121,7 @@ function ArchetypePanel({ digest }: { digest: Digest }) {
             {t.fundingTitle}
           </div>
           <div className="flex items-start gap-2">
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-gold-400/10 border border-gold-400/30 text-gold-400 shrink-0">
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-ruby-400/10 border border-ruby-400/30 text-ruby-400 shrink-0">
               {fundingLabel(digest.funding_source, t)}
             </span>
             {digest.funding_evidence.length > 0 && (
@@ -1110,9 +1152,9 @@ function DigestPanel({ digest }: { digest: Digest }) {
   const spamHoldings = holdings.filter((h) => h.is_spam);
 
   return (
-    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-gold-400/5">
+    <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-ruby-400/5">
       <header className="flex items-center justify-between mb-4 pb-3 border-b border-ink-700/60">
-        <h3 className="font-mono text-sm uppercase tracking-wider text-gold-400">{t.digestTitle}</h3>
+        <h3 className="font-mono text-sm uppercase tracking-wider text-ruby-400">{t.digestTitle}</h3>
         <code className="text-[11px] text-ink-500 font-mono truncate max-w-[60%]">
           {digest.address}
         </code>
@@ -1247,7 +1289,7 @@ function DigestPanel({ digest }: { digest: Digest }) {
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(digest.activity_categories).map(([cat, n]) => (
               <span key={cat} className="px-2 py-0.5 rounded-full bg-ink-800/60 border border-ink-700/60 text-[11px] font-mono">
-                {cat} <span className="text-gold-400 font-semibold">{n}</span>
+                {cat} <span className="text-ruby-400 font-semibold">{n}</span>
               </span>
             ))}
           </div>
@@ -1259,7 +1301,7 @@ function DigestPanel({ digest }: { digest: Digest }) {
           <SectionLabel>{t.heuristicFlags}</SectionLabel>
           <div className="flex flex-wrap gap-1.5">
             {digest.flags.map((f) => (
-              <span key={f} className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-gold-400/10 border border-gold-400/30 text-gold-400">
+              <span key={f} className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-ruby-400/10 border border-ruby-400/30 text-ruby-400">
                 {f}
               </span>
             ))}
@@ -1282,7 +1324,7 @@ function DigestPanel({ digest }: { digest: Digest }) {
                     {c.address.slice(0, 10)}…{c.address.slice(-6)} · {c.chains.join(', ')}
                   </div>
                 </div>
-                <span className="text-xs font-mono text-gold-400 shrink-0">{c.hits}×</span>
+                <span className="text-xs font-mono text-ruby-400 shrink-0">{c.hits}×</span>
               </li>
             ))}
           </ul>
@@ -1303,7 +1345,7 @@ function ChainList({ label, chains, accent }: { label: string; chains: string[];
             key={c}
             className={`px-2 py-0.5 rounded-full text-[11px] font-mono border ${
               accent === 'gold'
-                ? `bg-gold-400/5 border-gold-400/20 ${CHAIN_COLORS[c] ?? 'text-gold-400'}`
+                ? `bg-ruby-400/5 border-ruby-400/20 ${CHAIN_COLORS[c] ?? 'text-ruby-400'}`
                 : 'bg-ink-800/60 border-ink-700 text-ink-300'
             }`}
           >
@@ -1380,8 +1422,8 @@ function ShareButton({
       disabled={state === 'sharing'}
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono transition-colors disabled:opacity-50 ${
         state === 'copied'
-          ? 'bg-gold-400 text-ink-900 border border-gold-400'
-          : 'bg-gold-400/10 text-gold-400 border border-gold-400/30 hover:bg-gold-400/20'
+          ? 'bg-ruby-400 text-ink-900 border border-ruby-400'
+          : 'bg-ruby-400/10 text-ruby-400 border border-ruby-400/30 hover:bg-ruby-400/20'
       }`}
     >
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

@@ -83,11 +83,11 @@ export default function SharedAnalysis() {
 
       <header className="relative max-w-3xl mx-auto px-6 pt-12 pb-8 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 grid place-items-center font-bold text-ink-900 text-lg shadow-lg shadow-gold-400/20 group-hover:shadow-gold-400/40 transition-shadow">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-ruby-400 to-ruby-600 grid place-items-center font-bold text-ink-900 text-lg shadow-lg shadow-ruby-400/20 group-hover:shadow-ruby-400/40 transition-shadow">
             Y
           </div>
           <div>
-            <h1 className="font-bold tracking-tight">Yarrr<span className="text-gold-400">.</span>Tech</h1>
+            <h1 className="font-bold tracking-tight">Yarrr<span className="text-ruby-400">.</span>Tech</h1>
             <p className="text-[10px] text-ink-500 font-mono uppercase tracking-wider">
               shared analysis{id ? ` · ${id}` : ''}
             </p>
@@ -128,13 +128,13 @@ export default function SharedAnalysis() {
 
             {snap.digest?.archetypes?.length > 0 && (
               <div className="glass rounded-2xl p-5 sm:p-6 mb-6">
-                <h3 className="font-mono text-sm uppercase tracking-wider text-gold-400 mb-3 pb-2 border-b border-ink-700/60">
+                <h3 className="font-mono text-sm uppercase tracking-wider text-ruby-400 mb-3 pb-2 border-b border-ink-700/60">
                   {t.archetypeTitle}
                 </h3>
                 <div className="space-y-2">
                   {snap.digest.archetypes.map((a: any) => (
                     <div key={a.name} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-ink-800/60 border border-ink-700/60">
-                      <code className="font-mono font-semibold text-sm text-gold-400">{a.name}</code>
+                      <code className="font-mono font-semibold text-sm text-ruby-400">{a.name}</code>
                       <div className="flex items-center gap-2 text-[11px] font-mono text-ink-300">
                         <span className="uppercase tracking-wider">{a.bucket}</span>
                         <span className="px-2 py-0.5 rounded-full bg-ink-900/60 border border-ink-700">
@@ -147,9 +147,9 @@ export default function SharedAnalysis() {
               </div>
             )}
 
-            <article className="glass rounded-2xl p-6 sm:p-8 shadow-2xl shadow-gold-400/5">
+            <article className="glass rounded-2xl p-6 sm:p-8 shadow-2xl shadow-ruby-400/5">
               <header className="flex items-center justify-between mb-4 pb-3 border-b border-ink-700/60">
-                <h3 className="font-mono text-sm uppercase tracking-wider text-gold-400">{t.walletIntel}</h3>
+                <h3 className="font-mono text-sm uppercase tracking-wider text-ruby-400">{t.walletIntel}</h3>
                 <span className="text-xs text-ink-500 font-mono">{t.analysisComplete}</span>
               </header>
               <div className="prose-yarrr">
@@ -163,7 +163,7 @@ export default function SharedAnalysis() {
       <footer className="relative max-w-6xl mx-auto px-6 pt-20 pb-10 text-center">
         <div className="text-xs text-ink-500 font-mono">
           yarrr-node.com · {t.builtBy}{' '}
-          <span className="text-gold-400/80">{t.builtByName}</span>
+          <span className="text-ruby-400/80">{t.builtByName}</span>
           {' · '}{t.footerBuilt}
         </div>
       </footer>

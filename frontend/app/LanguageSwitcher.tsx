@@ -67,7 +67,7 @@ export function LanguageSwitcher() {
         onClick={() => setOpen((o) => !o)}
         aria-label={t.langLabel}
         aria-expanded={open}
-        className="inline-flex items-center gap-2 rounded-lg border border-ink-700 px-3 py-2 text-sm text-ink-300 hover:text-ink-50 hover:border-gold-400/40 transition-colors"
+        className="inline-flex items-center gap-2 rounded-lg border border-ink-700 px-3 py-2 text-sm text-ink-300 hover:text-ink-50 hover:border-ruby-400/40 transition-colors"
       >
         <Current.Flag className="w-5 h-[14px] rounded-sm overflow-hidden ring-1 ring-ink-700/60" />
         <span className="font-mono font-semibold">{Current.short}</span>
@@ -93,7 +93,7 @@ export function LanguageSwitcher() {
                 onClick={() => pick(l)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors ${
                   active
-                    ? 'bg-gold-400/10 text-gold-400'
+                    ? 'bg-ruby-400/10 text-ruby-400'
                     : 'text-ink-200 hover:bg-ink-700/60 hover:text-ink-50'
                 }`}
               >

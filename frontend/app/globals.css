@@ -2,59 +2,216 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================================================
+   Yarrr.Tech — Dark Ruby Luxury Theme
+
+   Design intent:
+   - Black/charcoal/wine background with subtle ruby radial glows
+   - Crimson highlights for action / brand
+   - Soft, restrained motion (no flashy effects)
+   - Premium card depth via layered shadows + thin internal highlights
+   ========================================================================= */
+
 @layer base {
   html {
     color-scheme: dark;
+    /* Smooth scrolling for fade-in-on-scroll observers */
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-ink-900 text-ink-50 antialiased;
+    /* Layered backdrop:
+       1) Deep ruby glow upper-left (mysterious entry point)
+       2) Wine glow bottom-right (richness)
+       3) Subtle vignette for depth
+       4) Animated shimmer band (very slow, almost imperceptible)
+       Background is fixed so scrolling reveals consistent atmosphere. */
+    background-color: #0a0606;
     background-image:
-      radial-gradient(ellipse at 50% -20%, rgba(251, 191, 36, 0.08), transparent 50%),
-      radial-gradient(ellipse at 80% 100%, rgba(15, 23, 42, 0.6), transparent 50%);
+      radial-gradient(ellipse 80% 50% at 15% -10%,  rgba(159, 18, 57, 0.18), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 85% 100%,  rgba(126, 17, 51, 0.20), transparent 65%),
+      radial-gradient(ellipse 100% 80% at 50% 50%,  rgba(10, 6, 6, 0.4), transparent 80%);
     background-attachment: fixed;
+    background-size: 100% 100%;
   }
   ::selection {
-    @apply bg-gold-400/30 text-gold-400;
+    @apply bg-ruby-500/35 text-ruby-100;
+  }
+  /* Smoother focus ring across the app */
+  :focus-visible {
+    outline: 2px solid rgba(225, 29, 72, 0.55);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
 @layer components {
+  /* ----- Glass surface — primary card wrapper ----- */
   .glass {
-    @apply bg-ink-800/40 backdrop-blur-xl border border-ink-700/50;
+    @apply relative bg-ink-800/40 backdrop-blur-xl border border-ruby-900/40
+           shadow-card-elevated;
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.0)),
+      linear-gradient(135deg, rgba(159, 18, 57, 0.06), rgba(0, 0, 0, 0.0));
   }
+  /* Subtle internal highlight at top edge — gives card a polished bevel */
+  .glass::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 8%;
+    right: 8%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(225, 29, 72, 0.35),
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  /* ----- Premium ruby button ----- */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg
-           bg-gold-400 text-ink-900 font-semibold px-5 py-2.5
-           hover:bg-gold-500 transition-colors
-           disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply relative inline-flex items-center justify-center gap-2 rounded-lg
+           font-semibold px-5 py-2.5
+           text-ink-50
+           transition-all duration-300 ease-out
+           disabled:opacity-50 disabled:cursor-not-allowed
+           overflow-hidden;
+    background-image: linear-gradient(135deg, #be123c 0%, #9f1239 60%, #7e1133 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.08) inset,
+      0 -1px 0 0 rgba(0, 0, 0, 0.3) inset,
+      0 4px 14px -4px rgba(225, 29, 72, 0.4),
+      0 0 0 1px rgba(225, 29, 72, 0.35);
   }
+  .btn-primary:hover:not(:disabled) {
+    background-image: linear-gradient(135deg, #e11d48 0%, #be123c 60%, #9f1239 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.12) inset,
+      0 -1px 0 0 rgba(0, 0, 0, 0.4) inset,
+      0 6px 20px -4px rgba(225, 29, 72, 0.55),
+      0 0 0 1px rgba(225, 29, 72, 0.5);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    transition-duration: 100ms;
+  }
+
+  /* Subtle metallic shimmer that sweeps across the button on hover */
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.08),
+      transparent
+    );
+    transition: left 0.6s ease;
+    pointer-events: none;
+  }
+  .btn-primary:hover::after {
+    left: 100%;
+  }
+
+  /* ----- Ghost / secondary button ----- */
   .btn-ghost {
     @apply inline-flex items-center gap-2 rounded-lg
-           border border-ink-700 px-4 py-2 text-sm
-           text-ink-300 hover:text-ink-50 hover:border-ink-500 transition-colors;
+           border border-ruby-900/40 px-4 py-2 text-sm
+           text-ink-300 bg-ink-800/30
+           hover:text-ink-50 hover:border-ruby-700/60 hover:bg-ink-800/60
+           transition-all duration-300 ease-out;
   }
+
+  /* ----- Input ----- */
   .input-base {
-    @apply w-full rounded-lg bg-ink-800/60 border border-ink-700
+    @apply w-full rounded-lg bg-ink-800/60 border border-ruby-900/30
            text-ink-50 placeholder:text-ink-400
-           focus:outline-none focus:ring-2 focus:ring-gold-400/40 focus:border-gold-400/60
-           transition-colors;
+           focus:outline-none focus:border-ruby-500/50
+           transition-all duration-300 ease-out;
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.02);
   }
+  .input-base:focus {
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.03),
+      0 0 0 3px rgba(225, 29, 72, 0.15);
+  }
+
+  /* ----- Grid background — subtle, not loud ----- */
   .grid-bg {
     background-image:
-      linear-gradient(rgba(30, 41, 59, 0.5) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(30, 41, 59, 0.5) 1px, transparent 1px);
-    background-size: 48px 48px;
-    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
-            mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+      linear-gradient(rgba(159, 18, 57, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(159, 18, 57, 0.07) 1px, transparent 1px);
+    background-size: 56px 56px;
+    -webkit-mask-image: radial-gradient(ellipse at center, black 25%, transparent 75%);
+            mask-image: radial-gradient(ellipse at center, black 25%, transparent 75%);
+  }
+
+  /* ----- Hero brand glow — the only "loud" element, deliberately so ----- */
+  .hero-glow {
+    background-image: radial-gradient(
+      ellipse 60% 50% at 50% 50%,
+      rgba(225, 29, 72, 0.18),
+      transparent 70%
+    );
+    filter: blur(20px);
+  }
+
+  /* ----- Section reveal — opacity-only fade for buttery scroll ----- */
+  .reveal {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ----- Ruby chip — small accent label ----- */
+  .ruby-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1
+           text-[11px] font-mono uppercase tracking-wider
+           text-ruby-300 bg-ruby-950/50 border border-ruby-800/50;
+    text-shadow: 0 0 12px rgba(225, 29, 72, 0.3);
+  }
+
+  /* ----- Animated gradient text — used sparingly for hero ----- */
+  .gradient-text-ruby {
+    background-image: linear-gradient(
+      135deg,
+      #f8fafc 0%,
+      #f7c1cb 40%,
+      #e11d48 70%,
+      #be123c 100%
+    );
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 12s ease-in-out infinite;
   }
 }
 
-/* Markdown rendering */
+/* =========================================================================
+   Markdown rendering inside analysis output
+   ========================================================================= */
 .prose-yarrr {
   @apply text-ink-100 leading-relaxed;
 }
 .prose-yarrr h2 {
-  @apply text-xl font-bold text-gold-400 mt-6 mb-3;
+  @apply text-xl font-bold mt-6 mb-3;
+  color: #e11d48;
+  text-shadow: 0 0 18px rgba(225, 29, 72, 0.18);
 }
 .prose-yarrr h3 {
   @apply text-base font-semibold text-ink-50 mt-5 mb-2;
@@ -69,10 +226,11 @@
 .prose-yarrr ol { @apply list-decimal; }
 .prose-yarrr li { @apply text-ink-100; }
 .prose-yarrr code {
-  @apply bg-ink-700/60 text-gold-400 px-1.5 py-0.5 rounded text-sm font-mono;
+  @apply bg-ruby-950/40 px-1.5 py-0.5 rounded text-sm font-mono;
+  color: #f29bab;
 }
 .prose-yarrr pre {
-  @apply bg-ink-900/80 border border-ink-700 rounded-lg p-4 overflow-x-auto my-4;
+  @apply bg-ink-900/80 border border-ruby-900/40 rounded-lg p-4 overflow-x-auto my-4;
 }
 .prose-yarrr pre code {
   @apply bg-transparent text-ink-100 p-0;
@@ -81,5 +239,26 @@
   @apply text-ink-50 font-semibold;
 }
 .prose-yarrr a {
-  @apply text-gold-400 underline underline-offset-2 hover:text-gold-500;
+  color: #f29bab;
+  @apply underline underline-offset-2;
+  transition: color 0.2s ease;
+}
+.prose-yarrr a:hover {
+  color: #e11d48;
+}
+
+/* =========================================================================
+   Reduced motion preference — kill all animations for users who request it
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
 }
