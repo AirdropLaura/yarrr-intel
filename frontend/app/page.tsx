@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useLang } from './LanguageContext';
@@ -228,6 +228,35 @@ export default function Home() {
   const [phase, setPhase] = useState<'idle' | 'fetching' | 'analyzing' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
 
+  // Track which lang the current output was rendered in. When user toggles
+  // language while we have a result on screen, re-run the analyze in the new
+  // language so the report stays aligned with the UI.
+  const [outputLang, setOutputLang] = useState<string | null>(null);
+  const langSwitchInFlight = useRef(false);
+
+  // Auto re-analyze when the user switches language mid-session. Only fires
+  // when we already have a finished output in a different language and we're
+  // not in the middle of another request.
+  useEffect(() => {
+    if (phase !== 'done') return;
+    if (!output) return;
+    if (!outputLang || outputLang === lang) return;
+    if (langSwitchInFlight.current) return;
+    langSwitchInFlight.current = true;
+    (async () => {
+      try {
+        if (mode === 'multi' && multiDigests && multiDigests.length > 0) {
+          await analyzeMulti();
+        } else if (address) {
+          await analyze(address);
+        }
+      } finally {
+        langSwitchInFlight.current = false;
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
+
   function isValidAddress(s: string) {
     return /^0x[a-fA-F0-9]{40}$/.test(s.trim());
   }
@@ -282,6 +311,7 @@ export default function Home() {
       const data = await res.json();
       setOutput(data.content || '');
       setMultiDigests(data.digests || []);
+      setOutputLang(lang);
       setPhase('done');
     } catch (e: any) {
       setError(e.message || 'request failed');
@@ -333,6 +363,7 @@ export default function Home() {
           } catch { /* ignore */ }
         }
       }
+      setOutputLang(lang);
       setPhase('done');
     } catch (e: any) {
       setError(e?.message ?? String(e));

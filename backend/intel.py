@@ -152,7 +152,16 @@ def build_messages(digest_block: str, lang: str = "en") -> list[dict]:
             "diterjemahkan ke Bahasa Indonesia.\n\n"
         )
     else:
-        lang_directive = "Write the entire report in English.\n\n"
+        lang_directive = (
+            "IMPORTANT: Write the entire report in English. Do NOT use Indonesian "
+            "phrasing, Indonesian section labels, or mix languages. Section "
+            "headings stay exactly as: ## TL;DR, ## Wallet archetype, ## Risk "
+            "notes, ## Behavioral summary, ## Timeline evolution, ## Notable "
+            "findings. Web3 jargon (smart money, airdrop hunter, swap, bridge, "
+            "MEV, dormant whale, NFT trader, archetype, sybil, testnet farmer) "
+            "stays English. Archetype names stay snake_case English (e.g. "
+            "airdrop_hunter, smart_money, testnet_farmer).\n\n"
+        )
 
     user = (
         f"{lang_directive}"
@@ -241,7 +250,16 @@ def build_messages_multi(combined_block: str, lang: str = "en", n: int = 2) -> l
             "diterjemahkan ke Bahasa Indonesia.\n\n"
         )
     else:
-        lang_directive = "Write the entire report in English.\n\n"
+        lang_directive = (
+            "IMPORTANT: Write the entire report in English. Do NOT use Indonesian "
+            "phrasing, Indonesian section labels, or mix languages. Section "
+            "headings stay exactly as: ## TL;DR, ## Wallet archetype, ## Risk "
+            "notes, ## Behavioral summary, ## Timeline evolution, ## Notable "
+            "findings. Web3 jargon (smart money, airdrop hunter, swap, bridge, "
+            "MEV, dormant whale, NFT trader, archetype, sybil, testnet farmer) "
+            "stays English. Archetype names stay snake_case English (e.g. "
+            "airdrop_hunter, smart_money, testnet_farmer).\n\n"
+        )
 
     user = (
         f"{lang_directive}"
