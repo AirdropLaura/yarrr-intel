@@ -79,6 +79,13 @@ export type Dict = {
   repBucketNeutral: string;
   repBucketLow: string;
   repBucketPoor: string;
+  modeSingle: string;
+  modeMulti: string;
+  multiPlaceholder: string;
+  multiHint: string;
+  multiAnalyze: string;
+  multiMinAddrs: string;
+  multiMaxAddrs: string;
   clusterTitle: string;
   clusterSubtitle: string;
   clusterSiblings: string;
@@ -118,16 +125,16 @@ export type Dict = {
 
 export const T: Record<Lang, Dict> = {
   id: {
-    taglineVersion: 'v0.3 · powered by MiMo V2.5',
+    taglineVersion: 'v0.10 · powered by MiMo V2.5',
     github: 'GitHub',
 
     betaBadge: 'Gratis selama beta',
     heroTitleA: 'Pahami wallet apa pun',
     heroTitleB: 'secara instan.',
-    heroSub: 'Tempelkan alamat EVM apa pun. AI membaca riwayat on-chain di 5 chain dan menjelaskan apa yang sebenarnya wallet itu lakukan — bukan sekadar saldo.',
+    heroSub: 'Tempelkan satu atau beberapa alamat EVM. AI membaca riwayat on-chain di 22 mainnet + 15 testnet dan menjelaskan apa yang sebenarnya wallet itu lakukan — bukan sekadar saldo.',
 
     introHeading: 'Tentang Yarrr.Tech',
-    introBody: 'Yarrr.Tech adalah layanan AI Wallet Intelligence yang memadatkan ratusan transaksi dari 5 EVM chain menjadi satu laporan singkat. Bukan portfolio tracker — kami menjelaskan apa yang wallet itu lakukan: airdrop hunter, smart money, dormant whale, NFT trader, atau MEV bot. Dibangun di atas Xiaomi MiMo V2.5, berjalan di satu VPS, dengan teliti.',
+    introBody: 'Yarrr.Tech adalah layanan AI Wallet Intelligence yang memadatkan ratusan transaksi dari 22 EVM mainnet + 15 testnet menjadi satu laporan singkat. Bukan portfolio tracker — kami menjelaskan apa yang wallet itu lakukan: airdrop hunter, smart money, dormant whale, NFT trader, atau MEV bot. Dibangun di atas Xiaomi MiMo V2.5, berjalan di satu VPS, dengan teliti.',
     builtBy: 'Dibangun oleh',
     builtByName: 'Bastiar',
     builtByRole: 'Developer & operator',
@@ -195,6 +202,13 @@ export const T: Record<Lang, Dict> = {
     repBucketNeutral: 'netral',
     repBucketLow: 'rendah',
     repBucketPoor: 'buruk',
+    modeSingle: 'Satu wallet',
+    modeMulti: 'Multi wallet',
+    multiPlaceholder: 'Tempel beberapa alamat (pisahkan dengan baris baru, koma, atau spasi)\n0x85B395f1511d3c14Ad984F02B2C4fbd7E56D0957\n0x1ce444466940637B0FcFe8a4543c9Bb6f2c2FcB1',
+    multiHint: '2-10 alamat. AI akan membandingkan dan mencari pola lintas wallet.',
+    multiAnalyze: 'Bandingkan',
+    multiMinAddrs: 'Minimum 2 alamat untuk analisis multi.',
+    multiMaxAddrs: 'Maksimum 10 alamat per batch.',
     clusterTitle: 'Sinyal sybil graph',
     clusterSubtitle: 'wallet dengan funding mirip',
     clusterSiblings: 'Sibling wallet',
@@ -232,16 +246,16 @@ export const T: Record<Lang, Dict> = {
     langEN: 'English',
   },
   en: {
-    taglineVersion: 'v0.3 · powered by MiMo V2.5',
+    taglineVersion: 'v0.10 · powered by MiMo V2.5',
     github: 'GitHub',
 
     betaBadge: 'Free during beta',
     heroTitleA: 'Understand any wallet',
     heroTitleB: 'instantly.',
-    heroSub: 'Paste any EVM wallet. AI reads its on-chain history across 5 chains and tells you what it actually does — not just balances.',
+    heroSub: 'Paste one or many EVM wallet addresses. AI reads on-chain history across 22 mainnets + 15 testnets and tells you what they actually do — not just balances.',
 
     introHeading: 'About Yarrr.Tech',
-    introBody: 'Yarrr.Tech is an AI Wallet Intelligence service that compresses hundreds of transactions across 5 EVM chains into a single concise report. Not a portfolio tracker — we tell you what the wallet actually does: airdrop hunter, smart money, dormant whale, NFT trader, or MEV bot. Built on Xiaomi MiMo V2.5, running on a single VPS, with care.',
+    introBody: 'Yarrr.Tech is an AI Wallet Intelligence service that compresses hundreds of transactions across 22 EVM mainnets + 15 testnets into a single concise report. Not a portfolio tracker — we tell you what the wallet actually does: airdrop hunter, smart money, dormant whale, NFT trader, or MEV bot. Built on Xiaomi MiMo V2.5, running on a single VPS, with care.',
     builtBy: 'Built by',
     builtByName: 'Bastiar',
     builtByRole: 'Developer & operator',
@@ -309,6 +323,13 @@ export const T: Record<Lang, Dict> = {
     repBucketNeutral: 'neutral',
     repBucketLow: 'low',
     repBucketPoor: 'poor',
+    modeSingle: 'Single wallet',
+    modeMulti: 'Multi wallet',
+    multiPlaceholder: 'Paste multiple addresses (separate by newline, comma, or space)\n0x85B395f1511d3c14Ad984F02B2C4fbd7E56D0957\n0x1ce444466940637B0FcFe8a4543c9Bb6f2c2FcB1',
+    multiHint: '2-10 addresses. AI will compare and find cross-wallet patterns.',
+    multiAnalyze: 'Compare',
+    multiMinAddrs: 'Minimum 2 addresses required for multi analysis.',
+    multiMaxAddrs: 'Maximum 10 addresses per batch.',
     clusterTitle: 'Sybil graph signal',
     clusterSubtitle: 'wallets with overlapping funding',
     clusterSiblings: 'Sibling wallets',

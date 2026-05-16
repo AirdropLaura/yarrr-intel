@@ -179,13 +179,73 @@ export default function Home() {
   const { lang, t } = useLang();
 
   const [address, setAddress] = useState('');
+  const [multiAddresses, setMultiAddresses] = useState('');
+  const [mode, setMode] = useState<'single' | 'multi'>('single');
   const [output, setOutput] = useState('');
   const [digest, setDigest] = useState<Digest | null>(null);
+  const [multiDigests, setMultiDigests] = useState<Digest[] | null>(null);
   const [phase, setPhase] = useState<'idle' | 'fetching' | 'analyzing' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
 
   function isValidAddress(s: string) {
     return /^0x[a-fA-F0-9]{40}$/.test(s.trim());
+  }
+
+  function parseMultiAddresses(raw: string): string[] {
+    // Accept newline / comma / space separated; trim each; dedupe lower
+    const parts = raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const p of parts) {
+      const k = p.toLowerCase();
+      if (!seen.has(k)) {
+        seen.add(k);
+        out.push(p);
+      }
+    }
+    return out;
+  }
+
+  async function analyzeMulti() {
+    const addrs = parseMultiAddresses(multiAddresses);
+    if (addrs.length < 2) {
+      setError(t.multiMinAddrs);
+      return;
+    }
+    if (addrs.length > 10) {
+      setError(t.multiMaxAddrs);
+      return;
+    }
+    for (const a of addrs) {
+      if (!isValidAddress(a)) {
+        setError(`${t.invalidAddress}: ${a.slice(0, 14)}…`);
+        return;
+      }
+    }
+    setError(null);
+    setOutput('');
+    setDigest(null);
+    setMultiDigests(null);
+    setPhase('fetching');
+
+    try {
+      const res = await fetch('/api/analyze/multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addresses: addrs, lang }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setOutput(data.content || '');
+      setMultiDigests(data.digests || []);
+      setPhase('done');
+    } catch (e: any) {
+      setError(e.message || 'request failed');
+      setPhase('idle');
+    }
   }
 
   async function analyze(addr?: string) {
@@ -302,6 +362,33 @@ export default function Home() {
 
       <section className="relative max-w-3xl mx-auto px-6">
         <div className="glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-gold-400/5">
+          {/* Mode toggle: single vs multi-address */}
+          <div className="mb-3 inline-flex rounded-full border border-ink-700/60 bg-ink-800/40 p-1">
+            <button
+              type="button"
+              onClick={() => { setMode('single'); setError(null); }}
+              className={`px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider transition-colors ${
+                mode === 'single'
+                  ? 'bg-gold-400/20 text-gold-400'
+                  : 'text-ink-400 hover:text-ink-200'
+              }`}
+            >
+              {t.modeSingle}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('multi'); setError(null); }}
+              className={`px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider transition-colors ${
+                mode === 'multi'
+                  ? 'bg-gold-400/20 text-gold-400'
+                  : 'text-ink-400 hover:text-ink-200'
+              }`}
+            >
+              {t.modeMulti}
+            </button>
+          </div>
+
+          {mode === 'single' ? (
           <div className="flex flex-col sm:flex-row gap-3">
             <input
               className="input-base font-mono text-sm sm:text-base px-4 py-3 flex-1"
@@ -320,6 +407,30 @@ export default function Home() {
               {loading ? t.analyzing : t.analyze}
             </button>
           </div>
+          ) : (
+          <div className="flex flex-col gap-3">
+            <textarea
+              className="input-base font-mono text-sm px-4 py-3 min-h-[120px] resize-y"
+              placeholder={t.multiPlaceholder}
+              value={multiAddresses}
+              onChange={(e) => setMultiAddresses(e.target.value)}
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+              <span className="text-[11px] font-mono text-ink-500">
+                {t.multiHint}
+              </span>
+              <button
+                className="btn-primary px-6 py-3 whitespace-nowrap"
+                onClick={() => analyzeMulti()}
+                disabled={loading || !multiAddresses.trim()}
+              >
+                {loading ? t.analyzing : t.multiAnalyze}
+              </button>
+            </div>
+          </div>
+          )}
 
           <div className="mt-3 flex flex-wrap gap-2 items-center">
             <span className="text-[11px] font-mono uppercase tracking-wider text-ink-500 mr-1">{t.tryLabel}</span>

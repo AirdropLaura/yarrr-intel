@@ -20,9 +20,12 @@ about it from address + method name.
 """
 from __future__ import annotations
 
+import logging
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+
+log = logging.getLogger("yarrr-tech.profiler")
 
 from .archetypes import Archetype, ArchetypeInputs, score_archetypes
 from .chain import ChainData, NFTTransfer, TokenTransfer
@@ -496,16 +499,22 @@ def build_digest(address: str, all_chain_data: list[ChainData], name: str | None
         digest.days_since_last_tx = max(int(time.time()) - digest.last_tx_ts, 0) // 86400
         digest.wallet_age_days = max((int(time.time()) - digest.first_tx_ts) // 86400, 1)
 
-    # Top contracts
+    # Top contracts — placeholder now, resolved later via enrich_top_contracts()
+    # The first pass tags only known contracts; remaining ones get resolved
+    # asynchronously after build_digest returns. This keeps build_digest pure
+    # while letting us enrich names from token transfers + Etherscan API.
     top = contract_hits.most_common(15)
     for addr, count in top:
         cat, label = KNOWN_CONTRACTS.get(addr, ("unknown", "Unknown contract"))
+        # Mark which chain(s) this contract was seen on so the resolver knows
+        # where to look up the verified name.
+        chains = sorted(contract_chain[addr])
         digest.top_contracts.append({
             "address": addr,
             "hits": count,
             "category": cat,
             "label": label,
-            "chains": sorted(contract_chain[addr]),
+            "chains": chains,
         })
 
     # Activity category histogram — only count txs the wallet INITIATED.
@@ -622,6 +631,156 @@ def build_digest(address: str, all_chain_data: list[ChainData], name: str | None
         digest.flags.append(f"testnet_active({len(digest.testnet_chains_active)})")
 
     return digest
+
+
+async def enrich_top_contracts(
+    digest: WalletDigest,
+    all_chain_data: list[ChainData],
+) -> None:
+    """Resolve missing names for top_contracts using contract_names module.
+
+    Mutates digest.top_contracts in place. Safe to call after build_digest.
+    Failures are silent — top_contracts retains its "Unknown contract" labels
+    if any source returned nothing.
+    """
+    try:
+        from .chain import _load_etherscan_key, get_chain
+        from .contract_names import resolve_contracts
+
+        api_key = _load_etherscan_key()
+
+        # Group unresolved contracts by chain so each resolve_contracts call
+        # is per-chain (Etherscan V2 lookup needs chain_id).
+        per_chain: dict[str, list[str]] = {}
+        for tc in digest.top_contracts:
+            if tc.get("category") != "unknown":
+                continue   # already known via curated dict
+            for chain_slug in tc.get("chains") or []:
+                per_chain.setdefault(chain_slug, []).append(tc["address"])
+
+        if not per_chain:
+            return
+
+        # Build chain_data lookup so we can pass token transfers to the resolver
+        cd_by_slug = {cd.chain: cd for cd in all_chain_data}
+
+        # Resolve all chains in parallel (different chains are independent).
+        # Pass full cd_by_slug as cross_chain_lookup so token name harvested on
+        # one chain is reusable for the same address on another (LayerZero,
+        # Stargate, Permit2 etc share addresses across chains).
+        async def resolve_one(chain_slug: str, addrs: list[str]):
+            chain = get_chain(chain_slug)
+            if not chain:
+                return chain_slug, {}
+            cd = cd_by_slug.get(chain_slug)
+            try:
+                resolved = await resolve_contracts(
+                    chain_id=chain.chain_id,
+                    chain_slug=chain_slug,
+                    addresses=addrs,
+                    chain_data=cd,
+                    api_key=api_key,
+                    cross_chain_lookup=cd_by_slug,
+                )
+            except Exception as e:
+                log.debug("resolve_contracts failed for %s: %s", chain_slug, e)
+                return chain_slug, {}
+            return chain_slug, resolved
+
+        import asyncio
+        results = await asyncio.gather(*[
+            resolve_one(slug, addrs) for slug, addrs in per_chain.items()
+        ])
+        # Flatten — first resolution wins per address (chains are roughly
+        # ordered primary→tertiary already; we trust the first hit).
+        all_resolved: dict[str, "ContractIdentity"] = {}
+        for _slug, m in results:
+            for addr, ident in m.items():
+                if addr not in all_resolved or all_resolved[addr].is_unknown():
+                    all_resolved[addr] = ident
+
+        # Fill back into digest.top_contracts (step 5/6 results)
+        for tc in digest.top_contracts:
+            ident = all_resolved.get(tc["address"])
+            if ident and not ident.is_unknown():
+                tc["category"] = ident.category
+                tc["label"] = ident.name
+                tc["resolution_source"] = ident.source
+
+        # Step 7: Method-selector heuristic on remaining unknowns.
+        # Look at the wallet's actual transactions to this contract — if it
+        # consistently called the same selector, we can label it without
+        # needing a verified ContractName. This catches unverified routers,
+        # custom proxies, and forks of well-known contracts.
+        # Also: if the wallet sent ETH directly with empty calldata to an
+        # address (method == "0x" or ""), it's a peer-to-peer transfer, not a
+        # contract interaction — label accordingly.
+        unresolved_after_api = [
+            tc["address"] for tc in digest.top_contracts
+            if tc.get("category") == "unknown"
+        ]
+        if unresolved_after_api:
+            from collections import Counter as _Counter
+            from .contract_names import selector_hint, short_address, store_cache
+            # Build per-contract selector frequency from raw txs across all chains
+            sel_freq: dict[str, _Counter] = {}
+            empty_method_count: dict[str, int] = {}
+            total_count: dict[str, int] = {}
+            for cd in all_chain_data:
+                for tx in (cd.txs or []):
+                    to = (tx.get("to") or "").lower()
+                    if to in unresolved_after_api:
+                        method = (tx.get("method") or "").lower().strip()
+                        total_count[to] = total_count.get(to, 0) + 1
+                        if method == "0x" or method == "":
+                            empty_method_count[to] = empty_method_count.get(to, 0) + 1
+                        elif method.startswith("0x") and len(method) >= 10:
+                            sel = method[:10]
+                            sel_freq.setdefault(to, _Counter())[sel] += 1
+
+            for addr in unresolved_after_api:
+                # Selector match wins
+                hint = None
+                if addr in sel_freq and sel_freq[addr]:
+                    top_sel, _ = sel_freq[addr].most_common(1)[0]
+                    hint = selector_hint(top_sel)
+
+                if hint:
+                    name, cat = hint
+                    src = "selector"
+                elif total_count.get(addr, 0) > 0 and empty_method_count.get(addr, 0) == total_count.get(addr, 0):
+                    # All txs to this address were plain ETH transfers
+                    name = "External wallet"
+                    cat = "transfer"
+                    src = "pattern"
+                else:
+                    # Final fallback: short address as label so the UI doesn't
+                    # show a useless "Unknown contract" — at least the user can
+                    # see WHICH contract it was.
+                    chains = next(
+                        (tc.get("chains") or [] for tc in digest.top_contracts if tc["address"] == addr),
+                        [],
+                    )
+                    chain_label = chains[0] if chains else "?"
+                    name = f"Contract on {chain_label}"
+                    cat = "contract"
+                    src = "fallback_short"
+
+                for tc in digest.top_contracts:
+                    if tc["address"] == addr:
+                        tc["category"] = cat
+                        tc["label"] = name
+                        tc["resolution_source"] = src
+                # Cache only verified-ish hits, not pattern fallbacks
+                if src == "selector":
+                    chains = next(
+                        (tc.get("chains") or [] for tc in digest.top_contracts if tc["address"] == addr),
+                        [],
+                    )
+                    if chains:
+                        store_cache(chains[0], addr, name, cat, src)
+    except Exception as e:
+        log.debug("enrich_top_contracts failed: %s", e)
 
 
 def digest_to_prompt_block(digest: WalletDigest) -> str:

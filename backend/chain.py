@@ -114,8 +114,16 @@ _TIER_LIMITS = {"primary": 50, "secondary": 30, "tertiary": 20}
 # Default scan profile: all mainnets + all major testnets.
 ALL_CHAINS: list[Chain] = MAINNETS + TESTNETS
 
-# Backwards-compat with old import sites (chain.py was historically `CHAINS`).
+# Backward-compat alias.
 CHAINS: list[Chain] = ALL_CHAINS
+
+# Slug → Chain lookup; built once at module load.
+_CHAIN_INDEX: dict[str, Chain] = {c.slug: c for c in ALL_CHAINS}
+
+
+def get_chain(slug: str) -> Chain | None:
+    """Look up a Chain by slug. Used by contract_names resolver."""
+    return _CHAIN_INDEX.get(slug)
 
 
 @dataclass

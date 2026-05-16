@@ -127,17 +127,103 @@ def build_messages(digest_block: str, lang: str = "en") -> list[dict]:
 
     user = (
         f"{lang_directive}"
-        "You are analyzing a single wallet across the 15+ EVM chains we monitor "
-        "(Ethereum, Base, Arbitrum, Optimism, Polygon, BSC, Avalanche, Linea, "
-        "Scroll, Blast, Mantle, World Chain, opBNB, Gnosis, Celo, zkSync — "
-        "plus matching testnets). Last 20-50 transactions per chain were "
-        "sampled. The behavioral digest below is precomputed by our profiler "
-        "and is the authoritative input — do not assume facts not in it.\n\n"
+        "You are analyzing a single wallet across the 22 EVM mainnets + 15 "
+        "testnets we monitor (Ethereum, Base, Arbitrum, Optimism, Polygon, "
+        "BSC, Avalanche, Linea, Scroll, Blast, Mantle, World Chain, opBNB, "
+        "Gnosis, Celo, zkSync, Berachain, Monad, Sonic, Abstract, Taiko, "
+        "Fraxtal — plus testnets for each). Last 20-50 transactions per "
+        "chain were sampled. The behavioral digest below is precomputed by "
+        "our profiler and is the authoritative input — do not assume facts "
+        "not in it.\n\n"
         f"{digest_block}\n\n"
         "Now write the wallet intelligence report following the section "
         "structure in the system prompt exactly."
     )
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user",   "content": user},
+    ]
+
+
+MULTI_SYSTEM_PROMPT = """You are a senior on-chain intelligence analyst \
+specializing in COMPARATIVE wallet analysis. You read precomputed digests \
+for multiple wallets and produce a single comparative report — not N \
+isolated reports glued together.
+
+Your job is to find:
+- Patterns shared across wallets (same archetype, same chain footprint, \
+correlated activity, possibly the same operator?)
+- Sharp contrasts (one is smart_money, another is airdrop_hunter — why?)
+- Risk signals that appear in some wallets but not others
+- Clusters: which wallets look related, which are independent
+
+Output structure (markdown headings stay English):
+
+## Comparative TL;DR
+One paragraph. Lead with what's interesting about THIS GROUP — same operator? \
+contrasting strategies? overlap on certain chains? Don't summarize each wallet \
+in isolation; that defeats the purpose of comparative analysis.
+
+## Per-wallet snapshot
+A compact line per wallet: `**Wallet N (0xabcd…wxyz)**: archetype, score, \
+one-sentence "what it does"`. Use the archetype names and reputation scores \
+from the digests. Keep this section punchy — it's the index, not the analysis.
+
+## Cross-wallet patterns
+The actual analysis. Bullet points covering:
+- Activity patterns shared (same DEX, same chain dominance, similar timing)
+- Funding source overlaps (same CEX hot wallet? same bridge?)
+- Reputation distribution (all high? wide range? clustered?)
+- Contrasts that matter
+
+## Cluster hypothesis
+If 2+ wallets look like the same operator, say so explicitly: which wallets, \
+what's the evidence (overlapping counterparties, same funding source, \
+synchronized activity, identical archetype). Be honest about strength of \
+evidence — say "weak signal" if it's only one shared chain.
+
+If wallets are clearly independent, say that in one sentence and stop.
+
+## Notable findings
+1-3 bullets that don't fit elsewhere. Anything user should know but didn't ask.
+
+Tone: investigative, evidence-led, every claim cites a digest fact. No hype, \
+no advice, no recommendations. Total ≤ 700 words. Markdown only.
+"""
+
+
+def build_messages_multi(combined_block: str, lang: str = "en", n: int = 2) -> list[dict]:
+    """Construct messages for comparative multi-wallet analysis.
+
+    `combined_block` is the concatenated per-wallet digests with `## Wallet N`
+    delimiters. `n` is the number of wallets included (LLM uses this to scale
+    the per-wallet snapshot section).
+    """
+    if lang == "id":
+        lang_directive = (
+            "PENTING: Tulis seluruh laporan dalam Bahasa Indonesia. "
+            "Pertahankan istilah teknis Web3 dalam bahasa Inggris (smart money, "
+            "airdrop hunter, swap, bridge, mint, LP, MEV, dormant whale, NFT trader, "
+            "governance, staker, multi-chain, archetype, sybil, testnet farmer, dsb). "
+            "Nama archetype WAJIB tetap snake_case English. Judul section markdown "
+            "(## Comparative TL;DR, ## Per-wallet snapshot, ## Cross-wallet patterns, "
+            "## Cluster hypothesis, ## Notable findings) WAJIB tetap dalam bahasa "
+            "Inggris persis. Hanya isi paragraf, bullet, dan kalimat yang "
+            "diterjemahkan ke Bahasa Indonesia.\n\n"
+        )
+    else:
+        lang_directive = "Write the entire report in English.\n\n"
+
+    user = (
+        f"{lang_directive}"
+        f"You are comparing {n} wallets. Each wallet's behavioral digest is "
+        "below, separated by `## Wallet N` headings. The digests are the "
+        "authoritative input — do not assume facts not in them.\n\n"
+        f"{combined_block}\n\n"
+        "Now write the comparative wallet intelligence report following the "
+        "section structure in the system prompt exactly."
+    )
+    return [
+        {"role": "system", "content": MULTI_SYSTEM_PROMPT},
         {"role": "user",   "content": user},
     ]

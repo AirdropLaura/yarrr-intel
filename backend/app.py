@@ -26,7 +26,7 @@ from .ens import resolve_name_safe
 from .intel import build_messages
 from .mimo_client import MimoClient
 from .persistence import get_snapshot, init_db, recent_for_address, save_snapshot
-from .profiler import build_digest, digest_to_prompt_block
+from .profiler import build_digest, digest_to_prompt_block, enrich_top_contracts
 
 log = logging.getLogger("yarrr-tech")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
@@ -87,6 +87,13 @@ async def _get_or_fetch_digest(address: str) -> dict:
     chain_data = await chain_task
 
     digest = build_digest(address, chain_data, name=name)
+    # Phase 4 enrichment — replace "Unknown contract" labels with verified
+    # names from token transfers, Etherscan getsourcecode, or selector hints.
+    # Best-effort; never blocks digest delivery on failure.
+    try:
+        await enrich_top_contracts(digest, chain_data)
+    except Exception as e:
+        log.debug("enrich_top_contracts skipped: %s", e)
     block = digest_to_prompt_block(digest)
     payload = {
         "digest": {
@@ -173,11 +180,13 @@ async def lifespan(app: FastAPI):
     app.state.mimo = MimoClient()
     init_db()
     from .cluster import init_funding_table
+    from .contract_names import init_contract_names_table
     from .webhooks import init_webhook_table, start_watcher, stop_watcher
     init_funding_table()
     init_webhook_table()
+    init_contract_names_table()
     app.state.webhook_task = start_watcher(app)
-    log.info("MiMo client initialized · DB ready · funding index ready · webhook watcher running")
+    log.info("MiMo client initialized · DB ready · funding+contract index ready · webhook watcher running")
     try:
         yield
     finally:
@@ -188,7 +197,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Yarrr.Tech",
     description="AI-native onchain identity intelligence — paste any wallet, instantly understand what it actually does.",
-    version="0.9.0",
+    version="0.10.0",
     lifespan=lifespan,
 )
 
@@ -233,6 +242,102 @@ async def analyze(req: AnalyzeRequest) -> dict:
         },
         "latency_seconds": result.latency_seconds,
         "digest": payload["digest"],
+    }
+
+
+@app.post("/api/analyze/multi")
+async def analyze_multi(payload: dict) -> dict:
+    """Batch analyze 2-10 wallets in parallel.
+
+    Body: {"addresses": ["0x…", "0x…"], "lang": "id" | "en", "model": "..."}
+    Returns per-wallet digest + a side-by-side comparison block.
+
+    LLM is called ONCE on the combined digests with a comparative-analyst
+    prompt — much cheaper than N solo calls and produces sharper insight
+    (the LLM can spot patterns across wallets).
+    """
+    addresses = payload.get("addresses") or []
+    lang = (payload.get("lang") or "id").strip()
+    model = payload.get("model") or "mimo-v2.5"
+
+    # Validation
+    if not isinstance(addresses, list) or not addresses:
+        raise HTTPException(status_code=400, detail="addresses must be a non-empty list")
+    if len(addresses) > 10:
+        raise HTTPException(status_code=400, detail="max 10 addresses per batch")
+    addresses = [a.strip() for a in addresses]
+    for a in addresses:
+        if not ETH_ADDRESS_RE.match(a):
+            raise HTTPException(status_code=400, detail=f"invalid address: {a[:24]}…")
+    # Dedupe while preserving order
+    seen = set()
+    unique = []
+    for a in addresses:
+        al = a.lower()
+        if al not in seen:
+            seen.add(al)
+            unique.append(a)
+    addresses = unique
+
+    # Fetch digests in parallel — semaphore caps simultaneous chain scans
+    sem = asyncio.Semaphore(3)
+
+    async def one(addr: str):
+        async with sem:
+            try:
+                return addr, await _get_or_fetch_digest(addr), None
+            except Exception as e:
+                log.exception("multi digest failed for %s", addr)
+                return addr, None, str(e)
+
+    results = await asyncio.gather(*[one(a) for a in addresses])
+
+    # Build combined prompt block — concatenates each wallet's digest with a
+    # "## Wallet N" delimiter so the LLM treats them as comparable entities.
+    blocks: list[str] = []
+    digests_out: list[dict] = []
+    for i, (addr, p, err) in enumerate(results, 1):
+        if err or not p:
+            digests_out.append({"address": addr, "error": err or "unknown"})
+            continue
+        blocks.append(f"## Wallet {i}: {addr}\n\n{p['prompt_block']}")
+        digests_out.append({"address": addr, **p["digest"]})
+
+    if not blocks:
+        raise HTTPException(status_code=502, detail="all digests failed")
+
+    combined_prompt = "\n\n---\n\n".join(blocks)
+
+    # Comparative analyst prompt — instruct LLM to look across wallets, not at
+    # each one in isolation. Retry once on transient MiMo upstream errors.
+    from .intel import build_messages_multi
+    messages = build_messages_multi(combined_prompt, lang=lang, n=len(blocks))
+    last_err = None
+    for attempt in range(2):
+        try:
+            result = await app.state.mimo.chat(messages=messages, model=model, max_tokens=2500)
+            break
+        except Exception as e:
+            last_err = e
+            log.warning("MiMo multi-analyze attempt %d failed: %s", attempt + 1, e)
+            if attempt == 0:
+                await asyncio.sleep(2)
+    else:
+        log.exception("MiMo failed for multi-analyze after retries")
+        raise HTTPException(status_code=502, detail=f"upstream error: {last_err}")
+
+    return {
+        "addresses": [d["address"] for d in digests_out],
+        "content": result.content,
+        "model": result.model,
+        "usage": {
+            "prompt_tokens": result.prompt_tokens,
+            "completion_tokens": result.completion_tokens,
+            "reasoning_tokens": result.reasoning_tokens,
+            "total_tokens": result.total_tokens,
+        },
+        "latency_seconds": result.latency_seconds,
+        "digests": digests_out,
     }
 
 
