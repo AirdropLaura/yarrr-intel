@@ -1,0 +1,168 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" font-family="'Inter', system-ui, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1f0510"/>
+      <stop offset="100%" stop-color="#0a0205"/>
+    </linearGradient>
+    <linearGradient id="ruby" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#e11d48"/>
+      <stop offset="100%" stop-color="#881337"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a0612" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#0d0309" stop-opacity="0.95"/>
+    </linearGradient>
+    <linearGradient id="mimoGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e11d48"/>
+      <stop offset="50%" stop-color="#9f1239"/>
+      <stop offset="100%" stop-color="#4c0519"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#e11d48"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="700" fill="url(#bg)"/>
+
+  <text x="60" y="50" font-size="14" font-weight="600" fill="#e11d48" letter-spacing="3">YARRR.TECH · ARCHITECTURE</text>
+  <text x="60" y="82" font-size="28" font-weight="700" fill="#fef2f2" font-family="'Cormorant Garamond', serif">AI Wallet Intelligence — 3-Layer Pipeline</text>
+  <text x="60" y="108" font-size="13" fill="#9c8b94">Onchain signal capture → deterministic compression → MiMo investigator reasoning</text>
+
+  <!-- Input -->
+  <g transform="translate(60, 150)">
+    <rect width="180" height="80" rx="12" fill="url(#card)" stroke="#3a0d1e" stroke-width="1.5"/>
+    <text x="20" y="32" font-size="11" font-weight="600" fill="#e11d48" letter-spacing="1.5">INPUT</text>
+    <text x="20" y="56" font-size="14" font-weight="600" fill="#fef2f2">Wallet Address</text>
+    <text x="20" y="72" font-size="11" fill="#9c8b94">0x... or .eth / .base</text>
+  </g>
+
+  <!-- Layer 1 -->
+  <g transform="translate(280, 150)">
+    <rect width="280" height="430" rx="16" fill="url(#card)" stroke="#5b1227" stroke-width="2"/>
+    <text x="20" y="32" font-size="11" font-weight="700" fill="#e11d48" letter-spacing="2">LAYER 1 · CAPTURE</text>
+    <text x="20" y="58" font-size="18" font-weight="700" fill="#fef2f2">Onchain Signal Engine</text>
+    <line x1="20" y1="76" x2="260" y2="76" stroke="#3a0d1e"/>
+
+    <text x="20" y="104" font-size="12" font-weight="600" fill="#fda4af">Etherscan V2 + Blockscout</text>
+    <text x="20" y="124" font-size="11" fill="#cbb5be">22 EVM mainnets · 15 testnets</text>
+
+    <text x="20" y="158" font-size="12" font-weight="600" fill="#fda4af">Per-chain fetch</text>
+    <text x="20" y="178" font-size="11" fill="#cbb5be">• txlist + txlistinternal</text>
+    <text x="20" y="194" font-size="11" fill="#cbb5be">• ERC-20 + NFT transfers</text>
+    <text x="20" y="210" font-size="11" fill="#cbb5be">• native + token balances</text>
+
+    <text x="20" y="244" font-size="12" font-weight="600" fill="#fda4af">ENS + Basename resolver</text>
+    <text x="20" y="264" font-size="11" fill="#cbb5be">vitalik.eth · onchain identity</text>
+
+    <text x="20" y="298" font-size="12" font-weight="600" fill="#fda4af">Rate-limited engine</text>
+    <text x="20" y="318" font-size="11" fill="#cbb5be">Token bucket 4 RPS · retry x4</text>
+
+    <text x="20" y="352" font-size="12" font-weight="600" fill="#fda4af">Asset trust resolver</text>
+    <text x="20" y="372" font-size="11" fill="#cbb5be">80+ curated bluechips · 7 chains</text>
+    <text x="20" y="388" font-size="11" fill="#cbb5be">7-level fallback ladder</text>
+
+    <rect x="20" y="402" width="240" height="14" rx="3" fill="#1f0510"/>
+    <text x="26" y="413" font-size="10" fill="#9c8b94" font-family="ui-monospace, monospace">~148 sub-calls · ~46s floor</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <line x1="568" y1="365" x2="608" y2="365" stroke="#e11d48" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Layer 2 -->
+  <g transform="translate(620, 150)">
+    <rect width="280" height="430" rx="16" fill="url(#card)" stroke="#5b1227" stroke-width="2"/>
+    <text x="20" y="32" font-size="11" font-weight="700" fill="#e11d48" letter-spacing="2">LAYER 2 · COMPRESS</text>
+    <text x="20" y="58" font-size="18" font-weight="700" fill="#fef2f2">Deterministic Profiler</text>
+    <line x1="20" y1="76" x2="260" y2="76" stroke="#3a0d1e"/>
+
+    <text x="20" y="104" font-size="12" font-weight="600" fill="#fda4af">Wallet Digest</text>
+    <text x="20" y="124" font-size="11" fill="#cbb5be">Hundreds of tx → ~2KB summary</text>
+
+    <text x="20" y="158" font-size="12" font-weight="600" fill="#fda4af">14 Archetype Detectors</text>
+    <text x="20" y="178" font-size="11" fill="#cbb5be">smart_money · airdrop_hunter</text>
+    <text x="20" y="194" font-size="11" fill="#cbb5be">mev_bot · dormant_whale</text>
+    <text x="20" y="210" font-size="11" fill="#cbb5be">stablecoin_native · nft_trader · ...</text>
+
+    <text x="20" y="244" font-size="12" font-weight="600" fill="#fda4af">Token Trust Tiers</text>
+    <text x="20" y="264" font-size="11" fill="#cbb5be">trusted · uncertain · spam</text>
+    <text x="20" y="280" font-size="11" fill="#cbb5be">per-token confidence + reasons</text>
+
+    <text x="20" y="314" font-size="12" font-weight="600" fill="#fda4af">Behavioral Signals</text>
+    <text x="20" y="334" font-size="11" fill="#cbb5be">funding source · wallet age</text>
+    <text x="20" y="350" font-size="11" fill="#cbb5be">approval risk · failed tx clusters</text>
+
+    <text x="20" y="384" font-size="12" font-weight="600" fill="#fda4af">Output</text>
+    <rect x="20" y="394" width="240" height="22" rx="3" fill="#1f0510"/>
+    <text x="26" y="409" font-size="10" fill="#fda4af" font-family="ui-monospace, monospace">deterministic · reproducible</text>
+  </g>
+
+  <!-- Arrow 2 -->
+  <line x1="908" y1="365" x2="948" y2="365" stroke="#e11d48" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Layer 3 (MiMo) -->
+  <g transform="translate(960, 150)">
+    <rect width="190" height="430" rx="16" fill="url(#mimoGrad)" stroke="#fda4af" stroke-width="2" filter="url(#glow)"/>
+    <text x="20" y="32" font-size="11" font-weight="700" fill="#fef2f2" letter-spacing="2">LAYER 3 · REASON</text>
+    <text x="20" y="58" font-size="18" font-weight="700" fill="#fff" font-family="'Cormorant Garamond', serif">MiMo V2.5</text>
+    <text x="20" y="76" font-size="11" fill="#fda4af" font-style="italic">Xiaomi flagship reasoning</text>
+    <line x1="20" y1="94" x2="170" y2="94" stroke="#fef2f2" stroke-opacity="0.3"/>
+
+    <text x="20" y="120" font-size="11" font-weight="600" fill="#fef2f2">Investigator Prompt</text>
+    <text x="20" y="138" font-size="10" fill="#fecdd3">Senior onchain analyst</text>
+    <text x="20" y="152" font-size="10" fill="#fecdd3">tone · ID + EN bilingual</text>
+
+    <text x="20" y="184" font-size="11" font-weight="600" fill="#fef2f2">Output</text>
+    <text x="20" y="202" font-size="10" fill="#fecdd3">• TL;DR verdict</text>
+    <text x="20" y="218" font-size="10" fill="#fecdd3">• archetype reasoning</text>
+    <text x="20" y="234" font-size="10" fill="#fecdd3">• risk classification</text>
+    <text x="20" y="250" font-size="10" fill="#fecdd3">• asset trust narrative</text>
+    <text x="20" y="266" font-size="10" fill="#fecdd3">• behavioral timeline</text>
+    <text x="20" y="282" font-size="10" fill="#fecdd3">• actionable findings</text>
+
+    <text x="20" y="316" font-size="11" font-weight="600" fill="#fef2f2">Why MiMo</text>
+    <text x="20" y="334" font-size="10" fill="#fecdd3">• reasoning depth</text>
+    <text x="20" y="348" font-size="10" fill="#fecdd3">• native ID quality</text>
+    <text x="20" y="362" font-size="10" fill="#fecdd3">• cost-efficient</text>
+    <text x="20" y="376" font-size="10" fill="#fecdd3">• OpenAI-compatible</text>
+
+    <rect x="20" y="392" width="150" height="22" rx="3" fill="#fef2f2" fill-opacity="0.12"/>
+    <text x="26" y="407" font-size="10" fill="#fef2f2" font-family="ui-monospace, monospace">~3-12s · 2.5K-4K tokens</text>
+  </g>
+
+  <!-- Output -->
+  <g transform="translate(60, 610)">
+    <rect width="1080" height="60" rx="12" fill="url(#card)" stroke="#5b1227" stroke-width="1.5"/>
+    <text x="24" y="28" font-size="11" font-weight="700" fill="#e11d48" letter-spacing="2">OUTPUT · USER-FACING</text>
+    <text x="24" y="48" font-size="13" fill="#cbb5be">Investigator-grade analysis · 3-tier asset trust UI · shareable URL · multi-wallet comparative · bilingual ID/EN</text>
+  </g>
+
+  <!-- Persistence side annotation -->
+  <g transform="translate(60, 260)">
+    <rect width="180" height="100" rx="12" fill="url(#card)" stroke="#3a0d1e" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="20" y="28" font-size="10" font-weight="600" fill="#9f1239" letter-spacing="1.5">PERSISTENCE</text>
+    <text x="20" y="48" font-size="12" font-weight="600" fill="#cbb5be">SQLite</text>
+    <text x="20" y="66" font-size="10" fill="#9c8b94">share snapshots</text>
+    <text x="20" y="80" font-size="10" fill="#9c8b94">/a/&lt;id&gt; URLs</text>
+    <text x="20" y="94" font-size="10" fill="#9c8b94">history per address</text>
+  </g>
+
+  <g transform="translate(60, 380)">
+    <rect width="180" height="100" rx="12" fill="url(#card)" stroke="#3a0d1e" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="20" y="28" font-size="10" font-weight="600" fill="#9f1239" letter-spacing="1.5">FRONTEND</text>
+    <text x="20" y="48" font-size="12" font-weight="600" fill="#cbb5be">Next.js 14</text>
+    <text x="20" y="66" font-size="10" fill="#9c8b94">static export · nginx</text>
+    <text x="20" y="80" font-size="10" fill="#9c8b94">ruby palette · Cormorant</text>
+    <text x="20" y="94" font-size="10" fill="#9c8b94">i18n ID/EN</text>
+  </g>
+
+  <g transform="translate(60, 500)">
+    <rect width="180" height="80" rx="12" fill="url(#card)" stroke="#3a0d1e" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="20" y="28" font-size="10" font-weight="600" fill="#9f1239" letter-spacing="1.5">BACKEND</text>
+    <text x="20" y="48" font-size="12" font-weight="600" fill="#cbb5be">FastAPI · Python 3.12</text>
+    <text x="20" y="66" font-size="10" fill="#9c8b94">single VPS · uvicorn :8421</text>
+  </g>
+</svg>

@@ -219,7 +219,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Yarrr.Tech",
     description="AI-native onchain identity intelligence — paste any wallet, instantly understand what it actually does.",
-    version="0.10.0",
+    version="0.11.0",
     lifespan=lifespan,
 )
 

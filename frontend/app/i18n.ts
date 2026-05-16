@@ -21,6 +21,7 @@ export type Dict = {
   builtBy: string;
   builtByName: string;
   builtByRole: string;
+  poweredBy: string;
   // input
   placeholder: string;
   analyze: string;
@@ -149,6 +150,7 @@ export const T: Record<Lang, Dict> = {
     builtBy: 'Dibangun oleh',
     builtByName: 'Bastiar',
     builtByRole: 'Developer & operator',
+    poweredBy: 'Reasoning by',
 
     placeholder: '0x... alamat wallet',
     analyze: 'Analisis →',
@@ -280,6 +282,7 @@ export const T: Record<Lang, Dict> = {
     builtBy: 'Built by',
     builtByName: 'Bastiar',
     builtByRole: 'Developer & operator',
+    poweredBy: 'Reasoning by',
 
     placeholder: '0x... wallet address',
     analyze: 'Analyze →',

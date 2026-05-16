@@ -631,6 +631,24 @@ export default function Home() {
             </svg>
             <span>Telegram · @yarrr23</span>
           </a>
+
+          {/* Powered by MiMo — model attribution */}
+          <a
+            href="https://mimo.xiaomi.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1.5
+                       bg-ink-950/40 border border-ink-700/40
+                       text-[10px] font-mono uppercase tracking-[0.18em] text-ink-400
+                       hover:text-ink-200 hover:border-ruby-700/40 hover:bg-ink-900/60
+                       transition-all duration-300"
+            aria-label="Powered by Xiaomi MiMo V2.5"
+            title="Reasoning by Xiaomi MiMo V2.5"
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-ruby-400/80 group-hover:bg-ruby-300 transition-colors" />
+            <span>{t.poweredBy}</span>
+            <span className="text-ruby-300">MiMo V2.5</span>
+          </a>
         </div>
       </footer>
     </main>
