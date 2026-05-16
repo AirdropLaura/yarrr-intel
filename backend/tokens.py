@@ -6,6 +6,8 @@ top-tier coverage than exhaustive but noisy.
 """
 from __future__ import annotations
 
+import re
+
 
 # Stablecoin contracts (USD, EUR, GBP, etc.) on EVM mainnets.
 # Used to compute stablecoin exposure and detect "stablecoin_native" archetype.
@@ -46,13 +48,59 @@ LP_TOKEN_PATTERNS = ("LP", "UNI-V2", "UNI-V3", "CAKE-LP", "SLP", "BLP", "PCS-LP"
 LST_TOKEN_PATTERNS = ("stETH", "rETH", "cbETH", "wstETH", "frxETH", "sfrxETH", "ezETH", "weETH")
 
 
-# Heuristic spam-NFT signals. We don't maintain a blocklist (impossible to
-# keep current), but we flag common patterns scammers use to inflate inbox.
-SPAM_NFT_NAME_KEYWORDS = (
-    "visit", "claim", "airdrop", "reward", "prize", "voucher",
-    "free", "$", "http", ".com", ".io", ".xyz", ".app",
-    "winner", "exclusive", "vip", "🎁", "🎉", "💰",
+# === Spam token / NFT detection ============================================
+# Scoring system. Each match adds points. Threshold ≥ 3 = spam.
+# Calibration goal: catch obvious spam without flagging legit DeFi protocols
+# whose names look "weird" (e.g. yearn.finance, 1inch.exchange, USDC.e).
+
+# STRONG (3 pts each, single match → spam): URL-like patterns. Real token
+# names almost never embed full URLs or shorteners.
+_SPAM_URL_PATTERNS = (
+    "www.", "http://", "https://", "://",
+    "bit.ly", "t.me/", "telegram.me/", "tinyurl", "goo.gl", "ow.ly", "tiny.cc",
+    "shorturl",
 )
+
+# STRONG (3 pts): multi-word phrases that are basically never in legit names.
+_SPAM_PHRASES = (
+    "use code", "claim now", "claim your", "your reward", "your prize",
+    "winner of", "earn rewards", "to claim", "to redeem",
+    "limited time", "exclusive offer", "you won", "you've won", "youve won",
+    "claim airdrop", "airdrop claim", "claim base",
+    "visit ", "visit:", "click here", "click to",
+    "free $", "free token", "free crypto", "free reward",
+    "redeem your", "redeem now", "rewards link",
+)
+
+# MEDIUM (2 pts): hostile TLDs. Curated to avoid false positives on legit
+# DeFi protocols that use TLD-style names (yearn.finance, 1inch.exchange,
+# kyber.network, ENS .eth, etc.). Only includes TLDs that are overwhelmingly
+# associated with crypto airdrop scams in observed data.
+_SPAM_TLDS = (
+    ".life", ".cfd", ".top", ".lol", ".fun", ".gift", ".bid",
+    ".click", ".live", ".vip", ".cash", ".gives", ".host",
+    ".biz", ".info", ".pro", ".sbs", ".buzz", ".wtf",
+    ".monster", ".uno", ".best", ".gold", ".free",
+)
+
+# SOFT (1 pt each): keyword signals — need 2+ for spam confidence. Word-bound
+# prefix match (\bclaim catches "claim", "claims", "claiming") so we don't
+# false-positive on substrings like "Acclaim" or "Reclaim".
+_SPAM_KEYWORDS_SOFT = (
+    "visit", "claim", "reward", "prize", "voucher",
+    "winner", "exclusive", "redeem", "giveaway",
+)
+
+# MEDIUM (2 pts each): keywords that legit tokens almost never use in name.
+# Legit airdrop campaigns name the TOKEN (e.g. "ARB", "OP"), not the
+# action ("Project Airdrop Pass"). Boosted from soft tier so single match
+# combined with one weak signal (length / "!") trips the threshold.
+_SPAM_KEYWORDS_MEDIUM = (
+    "airdrop", "freebie", "sweepstake",
+)
+
+# SOFT (1 pt each): emoji heavily used in airdrop spam.
+_SPAM_EMOJI = ("🎁", "🎉", "💰", "🎯", "✅", "🚀", "⚡", "💎", "🎊", "🪂")
 
 
 def is_stablecoin(contract: str) -> str | None:
@@ -71,8 +119,77 @@ def is_lst_token(symbol: str) -> bool:
 
 
 def looks_like_spam_nft(name: str, symbol: str) -> bool:
-    """Heuristic spam NFT detector. Conservative — false positives hurt more
-    than false negatives here because we don't want to label legit projects."""
-    haystack = f"{name} {symbol}".lower()
-    hits = sum(1 for kw in SPAM_NFT_NAME_KEYWORDS if kw.lower() in haystack)
-    return hits >= 1
+    """Heuristic spam token / NFT detector.
+
+    Scoring approach (threshold ≥ 3 = spam):
+    - URL pattern (www., http, ://, bit.ly, t.me/): 3 pts
+    - Hostile TLD (.life, .cfd, .top, .vip, etc): 2 pts
+    - Spam phrase ("use code", "claim now", "visit "): 3 pts
+    - Bracket structure ([...] in name): 1.5 pts
+    - Long name (>30 chars): 1 pt
+    - Multiple "!" (>=2): 1 pt
+    - Soft keyword (visit, claim, airdrop, ...): 1 pt each, word-bounded prefix
+    - Spam emoji (🎁, 🎉, 💰, etc): 1 pt each
+
+    Tuned to NOT false-positive on legit DeFi: yearn.finance, 1inch.exchange,
+    USDC.e, ChainLink, Aave, etc. all score 0.
+
+    Tuned to catch observed spam: 'WLD [WWW.WLD-ETHEN.LIFE]', 'Use code XYZ',
+    'Visit www.fake.cfd', '! RETIK [retikdrop.com]', etc.
+    """
+    haystack = f"{name or ''} {symbol or ''}".strip()
+    if not haystack:
+        return False
+
+    lower = haystack.lower()
+    score: float = 0.0
+
+    # === STRONG signals (any single match contributes 3 pts) ===
+    if any(p in lower for p in _SPAM_URL_PATTERNS):
+        score += 3
+    if any(phrase in lower for phrase in _SPAM_PHRASES):
+        score += 3
+
+    # === MEDIUM (TLD-only, +2) ===
+    if any(tld in lower for tld in _SPAM_TLDS):
+        score += 2
+
+    # === Structural anomalies ===
+    # Bracket pair: real tokens almost never use [...] in name.
+    # Common in spam: "WLD [WWW.WLD-ETHEN.LIFE]", "TOKEN [bit.ly/x]"
+    if "[" in haystack and "]" in haystack:
+        score += 1.5
+
+    # Long names — legit tokens usually <30 chars. Spam packs URLs in.
+    if len(haystack) > 30:
+        score += 1
+
+    # Multiple exclamation marks — common spam emphasis
+    if haystack.count("!") >= 2:
+        score += 1
+
+    # === SOFT keywords (word-boundary prefix match) ===
+    for kw in _SPAM_KEYWORDS_SOFT:
+        # \bclaim matches "claim", "claims", "claiming", "claimed"
+        # but NOT "Acclaim", "Reclaim" because the position of "claim" in
+        # those words is preceded by a word char ('c' / 'e').
+        if re.search(rf"\b{re.escape(kw)}", lower):
+            score += 1
+
+    # === MEDIUM keywords (worth 2 pts each — legit tokens basically never
+    # use these in their name) ===
+    for kw in _SPAM_KEYWORDS_MEDIUM:
+        if re.search(rf"\b{re.escape(kw)}", lower):
+            score += 2
+
+    # === SOFT emoji ===
+    for em in _SPAM_EMOJI:
+        if em in haystack:
+            score += 1
+
+    return score >= 3
+
+
+def looks_like_spam_token(name: str, symbol: str) -> bool:
+    """Alias of looks_like_spam_nft — same heuristic applies to ERC20 spam."""
+    return looks_like_spam_nft(name, symbol)
