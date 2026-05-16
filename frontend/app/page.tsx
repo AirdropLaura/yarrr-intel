@@ -404,10 +404,12 @@ export default function Home() {
               </span>
               <span className="text-ink-500">· {t.builtByRole}</span>
               <a
-                href="tg://user?id=7190034352"
+                href="https://t.me/yarrr23"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="group inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-ruby-950/40 border border-ruby-800/50 text-ruby-300 hover:text-ruby-200 hover:bg-ruby-900/50 hover:border-ruby-600/60 transition-all duration-300"
-                aria-label="Contact via Telegram"
-                title="Telegram ID: 7190034352"
+                aria-label="Contact via Telegram @yarrr23"
+                title="Telegram @yarrr23"
               >
                 <svg className="w-3 h-3 transition-transform duration-300 group-hover:scale-110" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
@@ -597,20 +599,22 @@ export default function Home() {
 
           {/* Telegram contact — single, clean, premium */}
           <a
-            href="tg://user?id=7190034352"
+            href="https://t.me/yarrr23"
+            target="_blank"
+            rel="noopener noreferrer"
             className="group mt-1 inline-flex items-center gap-2 rounded-full px-3 py-1.5
                        bg-ruby-950/50 border border-ruby-800/40
                        text-[11px] font-mono text-ruby-300
                        hover:text-ruby-200 hover:border-ruby-600/60 hover:bg-ruby-900/50
                        transition-all duration-300"
-            aria-label="Contact via Telegram"
-            title="Telegram ID: 7190034352"
+            aria-label="Contact via Telegram @yarrr23"
+            title="Telegram @yarrr23"
           >
             <svg className="w-3 h-3 transition-transform duration-300 group-hover:scale-110"
                  viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
             </svg>
-            <span>Telegram · 7190034352</span>
+            <span>Telegram · @yarrr23</span>
           </a>
         </div>
       </footer>
