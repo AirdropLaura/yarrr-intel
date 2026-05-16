@@ -65,6 +65,8 @@ type Digest = {
   balances_by_chain: Record<string, number>;
   txs_by_chain: Record<string, number>;
   total_txs: number;
+  total_internal_txs?: number;
+  partial_chains?: string[];
   total_balance_native: number;
   error_rate: number;
   first_tx_ts: number | null;
@@ -1063,12 +1065,27 @@ function DigestPanel({ digest }: { digest: Digest }) {
       </header>
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
-        <Stat label={t.statTotalTx}    value={digest.total_txs.toString()} />
+        <Stat
+          label={t.statTotalTx}
+          value={
+            digest.total_internal_txs && digest.total_internal_txs > 0
+              ? `${digest.total_txs} + ${digest.total_internal_txs}i`
+              : digest.total_txs.toString()
+          }
+        />
         <Stat label={t.statErrorRate}  value={`${(digest.error_rate * 100).toFixed(1)}%`} tone={digest.error_rate > 0.15 ? 'warn' : 'normal'} />
         <Stat label={t.statAge}        value={digest.wallet_age_days ? formatAge(digest.wallet_age_days, t) : '—'} />
         <Stat label={t.statFirstSeen}  value={digest.first_tx_ts ? new Date(digest.first_tx_ts * 1000).toLocaleDateString() : '—'} />
         <Stat label={t.statLastSeen}   value={ageString(digest.last_tx_ts, t)} />
       </div>
+
+      {digest.partial_chains && digest.partial_chains.length > 0 && (
+        <div className="mb-4 rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-200/90 font-mono">
+          <span className="text-amber-400 mr-2">⚠</span>
+          {t.partialWarning.replace('{n}', digest.partial_chains.length.toString())}
+          <span className="text-ink-500"> ({digest.partial_chains.slice(0, 6).join(', ')}{digest.partial_chains.length > 6 ? '…' : ''})</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <ChainList

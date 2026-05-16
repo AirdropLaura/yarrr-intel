@@ -106,6 +106,8 @@ async def _get_or_fetch_digest(address: str) -> dict:
             "balances_by_chain": digest.balances_by_chain,
             "txs_by_chain": digest.txs_by_chain,
             "total_txs": digest.total_txs,
+            "total_internal_txs": digest.total_internal_txs,
+            "partial_chains": digest.partial_chains,
             "total_balance_native": digest.total_balance_native,
             "error_rate": digest.error_rate,
             "first_tx_ts": digest.first_tx_ts,

@@ -163,10 +163,12 @@ class ChainData:
     is_testnet: bool = False
     balance: float = 0.0
     tx_count: int = 0
+    internal_tx_count: int = 0  # incoming ETH from contracts (txlistinternal)
     txs: list[dict] = field(default_factory=list)
     erc20_transfers: list[TokenTransfer] = field(default_factory=list)
     nft_transfers: list[NFTTransfer] = field(default_factory=list)
     error: str | None = None
+    partial: bool = False  # set True if any sub-call failed/retried out
 
 
 _UA = {"User-Agent": "Yarrr.Tech/0.4 (+https://yarrr-node.com)"}

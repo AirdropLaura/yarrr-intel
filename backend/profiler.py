@@ -181,8 +181,13 @@ class WalletDigest:
 
     # Tx volume
     total_txs: int = 0
+    total_internal_txs: int = 0      # incoming ETH from contracts (txlistinternal)
     txs_by_chain: dict[str, int] = field(default_factory=dict)
     error_rate: float = 0.0
+
+    # Data quality — chains that returned partial data (sub-call failures
+    # during fetch). Surfaced to UI so users know to retry if list non-empty.
+    partial_chains: list[str] = field(default_factory=list)
 
     # Time signals
     first_tx_ts: int | None = None
@@ -458,7 +463,23 @@ def build_digest(address: str, all_chain_data: list[ChainData], name: str | None
     for cd in all_chain_data:
         digest.balances_by_chain[cd.chain] = round(cd.balance, 6)
         digest.txs_by_chain[cd.chain] = cd.tx_count
-        if cd.tx_count > 0 or cd.balance > 0:
+        # Track partial fetches so the UI can warn that the chain's data is
+        # incomplete (rate limit / timeout / provider hiccup).
+        if cd.partial:
+            digest.partial_chains.append(cd.chain)
+        # A chain is "active" if there's any onchain footprint: external txs,
+        # internal txs (incoming ETH from contracts), token transfers, NFT
+        # transfers, OR a non-zero native balance. Without internal_tx_count
+        # and transfer counts, receive-only wallets (airdrops, bridge
+        # withdrawals) get misclassified as dormant.
+        has_activity = (
+            cd.tx_count > 0
+            or getattr(cd, "internal_tx_count", 0) > 0
+            or len(cd.erc20_transfers) > 0
+            or len(cd.nft_transfers) > 0
+            or cd.balance > 0
+        )
+        if has_activity:
             digest.chains_active.append(cd.chain)
             if cd.is_testnet:
                 digest.testnet_chains_active.append(cd.chain)
@@ -469,6 +490,7 @@ def build_digest(address: str, all_chain_data: list[ChainData], name: str | None
         if not cd.is_testnet:
             digest.total_balance_native += cd.balance
         digest.total_txs += cd.tx_count
+        digest.total_internal_txs += getattr(cd, "internal_tx_count", 0)
 
         for tx in cd.txs:
             all_txs.append(tx)

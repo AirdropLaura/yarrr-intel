@@ -106,6 +106,7 @@ export type Dict = {
   statFirstSeen: string;
   statLastSeen: string;
   statAge: string;
+  partialWarning: string;
   nativeBalances: string;
   activityCategories: string;
   heuristicFlags: string;
@@ -229,6 +230,7 @@ export const T: Record<Lang, Dict> = {
     statFirstSeen: 'Pertama',
     statLastSeen: 'Terakhir',
     statAge: 'Umur wallet',
+    partialWarning: 'Sebagian data ({n} chain) tidak lengkap karena Etherscan rate-limit. Coba ulangi sebentar lagi untuk hasil penuh.',
     nativeBalances: 'Saldo native',
     activityCategories: 'Kategori aktivitas',
     heuristicFlags: 'Flag heuristik',
@@ -350,6 +352,7 @@ export const T: Record<Lang, Dict> = {
     statFirstSeen: 'First seen',
     statLastSeen: 'Last seen',
     statAge: 'Wallet age',
+    partialWarning: 'Some data ({n} chains) is incomplete due to Etherscan rate limits. Retry shortly for full results.',
     nativeBalances: 'Native balances',
     activityCategories: 'Activity categories',
     heuristicFlags: 'Heuristic flags',
