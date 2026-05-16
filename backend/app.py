@@ -130,6 +130,7 @@ async def _get_or_fetch_digest(address: str) -> dict:
                 "distinct_nft_collections": digest.tokens.distinct_nft_collections,
                 "spam_nft_count": digest.tokens.spam_nft_count,
                 "spam_nft_examples": digest.tokens.spam_nft_examples,
+                "holdings_trust": digest.tokens.holdings_trust,
                 "holdings": [
                     {
                         "chain": h.chain,
@@ -142,6 +143,10 @@ async def _get_or_fetch_digest(address: str) -> dict:
                         "is_lp": h.is_lp,
                         "is_lst": h.is_lst,
                         "is_spam": h.is_spam,
+                        "trust_tier": h.trust_tier,
+                        "trust_score": h.trust_score,
+                        "trust_summary": h.trust_summary,
+                        "trust_reasons": h.trust_reasons,
                     }
                     for h in digest.tokens.holdings
                 ],
@@ -242,7 +247,7 @@ async def analyze(req: AnalyzeRequest) -> dict:
 
     messages = build_messages(payload["prompt_block"], lang=req.lang)
     try:
-        result = await app.state.mimo.chat(messages=messages, model=req.model, max_tokens=2500)
+        result = await app.state.mimo.chat(messages=messages, model=req.model, max_tokens=4000)
     except Exception as e:
         log.exception("MiMo failed")
         raise HTTPException(status_code=502, detail=f"upstream error: {e}")
@@ -332,7 +337,7 @@ async def analyze_multi(payload: dict) -> dict:
     last_err = None
     for attempt in range(2):
         try:
-            result = await app.state.mimo.chat(messages=messages, model=model, max_tokens=2500)
+            result = await app.state.mimo.chat(messages=messages, model=model, max_tokens=4000)
             break
         except Exception as e:
             last_err = e
@@ -376,7 +381,7 @@ async def analyze_stream(req: AnalyzeRequest):
         yield f"data: {json.dumps({'phase': 'analyzing', 'message': 'Analyst is interpreting the wallet...'})}\n\n"
         messages = build_messages(payload["prompt_block"], lang=req.lang)
         try:
-            async for chunk in app.state.mimo.chat_stream(messages=messages, model=req.model, max_tokens=2500):
+            async for chunk in app.state.mimo.chat_stream(messages=messages, model=req.model, max_tokens=4000):
                 choice = (chunk.get("choices") or [{}])[0]
                 delta = choice.get("delta") or {}
                 if "content" in delta and delta["content"]:

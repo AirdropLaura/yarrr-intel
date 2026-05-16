@@ -108,6 +108,13 @@ export type Dict = {
   statAge: string;
   partialWarning: string;
   nativeBalances: string;
+  // Asset trust (Phase 4)
+  assetTrustTitle: string;
+  assetTrustHint: string;
+  trustedAssets: string;
+  uncertainAssets: string;
+  spamAssets: string;
+  spamHint: string;
   tokenHoldings: string;
   tokenHoldingsHint: string;
   spamHoldings: string;
@@ -235,6 +242,12 @@ export const T: Record<Lang, Dict> = {
     statAge: 'Umur wallet',
     partialWarning: 'Sebagian data ({n} chain) tidak lengkap karena Etherscan rate-limit. Coba ulangi sebentar lagi untuk hasil penuh.',
     nativeBalances: 'Saldo native',
+    assetTrustTitle: 'Kepercayaan aset',
+    assetTrustHint: '(klasifikasi token)',
+    trustedAssets: 'Aset terverifikasi',
+    uncertainAssets: 'Kepercayaan rendah',
+    spamAssets: 'Token spam tersembunyi',
+    spamHint: 'klik untuk membuka',
     tokenHoldings: 'Token holdings',
     tokenHoldingsHint: '(perkiraan dari net flow)',
     spamHoldings: 'Token spam tersembunyi ({n})',
@@ -360,8 +373,14 @@ export const T: Record<Lang, Dict> = {
     statAge: 'Wallet age',
     partialWarning: 'Some data ({n} chains) is incomplete due to Etherscan rate limits. Retry shortly for full results.',
     nativeBalances: 'Native balances',
+    assetTrustTitle: 'Asset trust',
+    assetTrustHint: '(token classification)',
+    trustedAssets: 'Trusted Assets',
+    uncertainAssets: 'Low Confidence',
+    spamAssets: 'Hidden Spam Tokens',
+    spamHint: 'click to expand',
     tokenHoldings: 'Token holdings',
-    tokenHoldingsHint: '(approximate, from net flow)',
+    tokenHoldingsHint: '(estimated from net flow)',
     spamHoldings: 'Hidden spam tokens ({n})',
     activityCategories: 'Activity categories',
     heuristicFlags: 'Heuristic flags',

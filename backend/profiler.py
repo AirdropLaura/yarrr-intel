@@ -131,6 +131,12 @@ class TokenHolding:
 
     NOT exact — we only see the most recent N tokentx events per chain. Use
     this for "wallet currently holds ~X USDC" signals, treat as best-effort.
+
+    Trust fields are populated by `asset_trust.classify_token()`:
+    - trust_tier:    "trusted" | "uncertain" | "spam"
+    - trust_score:   0–100 confidence
+    - trust_summary: one-line plain-English verdict
+    - trust_reasons: bullet-style human-readable reasons
     """
     chain: str
     contract: str
@@ -142,6 +148,11 @@ class TokenHolding:
     is_lp: bool = False
     is_lst: bool = False
     is_spam: bool = False
+    # Trust enrichment (filled in _analyze_tokens)
+    trust_tier: str = "uncertain"
+    trust_score: int = 50
+    trust_summary: str = ""
+    trust_reasons: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -158,6 +169,9 @@ class TokenSignals:
     spam_nft_examples: list[str] = field(default_factory=list)
     # Net-flow holdings — top tokens with positive balance from observed transfers.
     holdings: list[TokenHolding] = field(default_factory=list)
+    # Aggregate trust signals across all holdings — populated post-classify.
+    # Schema mirrors asset_trust.summarize_holdings_trust() output.
+    holdings_trust: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -425,6 +439,41 @@ def _analyze_tokens(all_chain_data: list[ChainData], wallet: str) -> TokenSignal
         -h.amount,
     ))
     sigs.holdings = holdings[:30]
+
+    # === Trust classification ============================================
+    # Each holding gets a verdict (trusted / uncertain / spam) + confidence
+    # score + reasons. Done here (instead of in classify_token at construction
+    # time) because we want consistent ordering and cap-30 already applied.
+    from .asset_trust import classify_token, summarize_holdings_trust
+
+    # Build chain→is_testnet lookup so the trust engine can soften bluechip
+    # impersonation rules on testnets (e.g. Sepolia DAI is a faucet, not scam).
+    is_testnet_by_chain = {cd.chain: cd.is_testnet for cd in all_chain_data}
+
+    for h in sigs.holdings:
+        verdict = classify_token(
+            chain=h.chain,
+            contract=h.contract,
+            name=h.name,
+            symbol=h.symbol,
+            is_testnet=is_testnet_by_chain.get(h.chain, False),
+        )
+        h.trust_tier = verdict.tier
+        h.trust_score = verdict.confidence
+        h.trust_summary = verdict.verdict_short
+        h.trust_reasons = verdict.reasons
+        # Keep is_spam in sync with the verdict so legacy consumers still work.
+        if verdict.tier == "spam":
+            h.is_spam = True
+
+    # Aggregate roll-up for the digest / LLM / UI top-line
+    sigs.holdings_trust = summarize_holdings_trust([
+        {
+            "trust_tier": h.trust_tier,
+            "amount": h.amount,
+            "symbol": h.symbol,
+        } for h in sigs.holdings
+    ])
 
     sigs.stablecoin_volume_usd = round(sc_volume, 2)
     sigs.stablecoin_chains = sorted(sc_chains)
@@ -977,6 +1026,53 @@ def digest_to_prompt_block(digest: WalletDigest) -> str:
         if digest.tokens.spam_nft_count:
             examples = ", ".join(f'"{x}"' for x in digest.tokens.spam_nft_examples[:3])
             lines.append(f"- spam NFT drops received: {digest.tokens.spam_nft_count} ({examples})")
+        lines.append("")
+
+    # Holdings trust verdict (Phase 4) — explicit per-token classification so
+    # the analyst doesn't quote unverified token amounts as if they were real.
+    if digest.tokens.holdings:
+        ht = digest.tokens.holdings_trust or {}
+        lines.append("### Holdings trust verdict")
+        if ht.get("headline"):
+            lines.append(f"- {ht['headline']}")
+        lines.append(
+            f"- breakdown: trusted={ht.get('trusted_count', 0)}, "
+            f"uncertain={ht.get('uncertain_count', 0)}, "
+            f"spam={ht.get('spam_count', 0)}"
+        )
+        lines.append("")
+
+        # Per-token verdicts — only show top 12 to keep prompt budget tight.
+        # Sort: trusted first (by amount desc), then uncertain, then spam.
+        ranked = sorted(
+            digest.tokens.holdings,
+            key=lambda h: (
+                {"trusted": 0, "uncertain": 1, "spam": 2}.get(h.trust_tier, 3),
+                -h.amount,
+            ),
+        )[:12]
+        lines.append("### Per-token trust (max 12 shown)")
+        for h in ranked:
+            sym = h.symbol or "?"
+            chain = h.chain
+            tier = h.trust_tier.upper()
+            score = h.trust_score
+            # Compact amount formatter
+            amt = h.amount
+            if amt >= 1_000_000:
+                amt_str = f"{amt/1_000_000:.1f}M"
+            elif amt >= 1_000:
+                amt_str = f"{amt/1_000:.1f}K"
+            elif amt >= 1:
+                amt_str = f"{amt:.2f}"
+            else:
+                amt_str = f"{amt:.4f}"
+            head = f"- {sym} on {chain}: ~{amt_str} · trust={tier} ({score}/100)"
+            lines.append(head)
+            if h.trust_summary:
+                lines.append(f"  · verdict: {h.trust_summary}")
+            for r in (h.trust_reasons or [])[:2]:
+                lines.append(f"  · reason: {r}")
         lines.append("")
 
     # Failed tx clusters (Phase 2a)

@@ -25,6 +25,20 @@ type TokenHolding = {
   is_lp: boolean;
   is_lst: boolean;
   is_spam: boolean;
+  // Trust verdict (Phase 4)
+  trust_tier?: 'trusted' | 'uncertain' | 'spam';
+  trust_score?: number;       // 0-100
+  trust_summary?: string;
+  trust_reasons?: string[];
+};
+
+type HoldingsTrust = {
+  trusted_count: number;
+  uncertain_count: number;
+  spam_count: number;
+  real_token_count: number;
+  spam_ratio: number;
+  headline: string;
 };
 
 type TokenSignals = {
@@ -38,6 +52,7 @@ type TokenSignals = {
   spam_nft_count: number;
   spam_nft_examples: string[];
   holdings?: TokenHolding[];
+  holdings_trust?: HoldingsTrust;
 };
 
 type FailedTxCluster = {
@@ -1140,6 +1155,73 @@ function ArchetypePanel({ digest }: { digest: Digest }) {
   );
 }
 
+function HoldingCard({ h, tier }: { h: TokenHolding; tier: 'trusted' | 'uncertain' }) {
+  // Visual treatment per tier — green for trusted, amber for uncertain.
+  const isTrusted = tier === 'trusted';
+  const tierBorder = isTrusted ? 'border-emerald-800/40' : 'border-amber-800/40';
+  const tierBg = isTrusted ? 'bg-emerald-950/20' : 'bg-amber-950/15';
+  const scoreColor = isTrusted ? 'text-emerald-300' : 'text-amber-300';
+  const score = h.trust_score ?? (isTrusted ? 90 : 50);
+
+  return (
+    <details
+      className={`group rounded-lg border ${tierBorder} ${tierBg} transition-colors`}
+    >
+      <summary className="cursor-pointer select-none px-3 py-2 list-none flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-sm font-mono font-semibold truncate">
+              {h.symbol || '???'}
+            </span>
+            {h.is_stablecoin && (
+              <span className="px-1 py-px rounded bg-emerald-900/40 border border-emerald-700/40 text-[9px] font-mono text-emerald-300 uppercase">
+                stable
+              </span>
+            )}
+            {h.is_lp && (
+              <span className="px-1 py-px rounded bg-blue-900/40 border border-blue-700/40 text-[9px] font-mono text-blue-300 uppercase">
+                LP
+              </span>
+            )}
+            {h.is_lst && (
+              <span className="px-1 py-px rounded bg-purple-900/40 border border-purple-700/40 text-[9px] font-mono text-purple-300 uppercase">
+                LST
+              </span>
+            )}
+          </div>
+          <div className={`text-[10px] font-mono uppercase tracking-wider ${CHAIN_COLORS[h.chain] ?? 'text-ink-400'}`}>
+            {h.chain}
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-sm font-mono">{formatTokenAmount(h.amount)}</div>
+          <div className={`text-[10px] font-mono ${scoreColor} mt-0.5`}>
+            {score}/100
+          </div>
+        </div>
+      </summary>
+
+      {/* Verdict + reasons reveal */}
+      {(h.trust_summary || (h.trust_reasons && h.trust_reasons.length > 0)) && (
+        <div className="px-3 pb-3 pt-1 border-t border-ink-700/40 mt-1">
+          {h.trust_summary && (
+            <div className="text-[12px] text-ink-200 leading-relaxed mb-1.5">
+              {h.trust_summary}
+            </div>
+          )}
+          {h.trust_reasons && h.trust_reasons.length > 0 && (
+            <ul className="text-[11px] text-ink-400 space-y-0.5 ml-3 list-disc">
+              {h.trust_reasons.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </details>
+  );
+}
+
 function DigestPanel({ digest }: { digest: Digest }) {
   const { t } = useLang();
   // Show balances for ALL active chains (mainnet + testnet) — testnet wallets
@@ -1152,8 +1234,16 @@ function DigestPanel({ digest }: { digest: Digest }) {
     .filter(([, bal]) => bal > 0);
 
   const holdings = digest.tokens?.holdings || [];
-  const realHoldings = holdings.filter((h) => !h.is_spam);
-  const spamHoldings = holdings.filter((h) => h.is_spam);
+  // Three-tier classification from backend trust engine. Falls back to
+  // legacy is_spam flag if trust_tier is missing (older API responses).
+  const trustedHoldings = holdings.filter((h) => h.trust_tier === 'trusted');
+  const uncertainHoldings = holdings.filter(
+    (h) => h.trust_tier === 'uncertain' || (!h.trust_tier && !h.is_spam),
+  );
+  const spamHoldings = holdings.filter(
+    (h) => h.trust_tier === 'spam' || (!h.trust_tier && h.is_spam),
+  );
+  const trustSummary = digest.tokens?.holdings_trust;
 
   return (
     <article className="mt-6 glass rounded-2xl p-5 sm:p-6 shadow-2xl shadow-ruby-400/5">
@@ -1238,53 +1328,96 @@ function DigestPanel({ digest }: { digest: Digest }) {
         </div>
       )}
 
-      {realHoldings.length > 0 && (
-        <div className="mb-4">
-          <SectionLabel>{t.tokenHoldings} <span className="text-ink-500 font-normal text-[10px] ml-1">{t.tokenHoldingsHint}</span></SectionLabel>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {realHoldings.map((h, i) => (
-              <div key={`${h.chain}-${h.contract}-${i}`} className="px-3 py-2 rounded-lg bg-ink-800/60 border border-ink-700/60 flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-mono font-semibold truncate">{h.symbol || '???'}</span>
-                    {h.is_stablecoin && (
-                      <span className="px-1 py-px rounded bg-emerald-900/40 border border-emerald-700/40 text-[9px] font-mono text-emerald-300 uppercase">stable</span>
-                    )}
-                    {h.is_lp && (
-                      <span className="px-1 py-px rounded bg-blue-900/40 border border-blue-700/40 text-[9px] font-mono text-blue-300 uppercase">LP</span>
-                    )}
-                    {h.is_lst && (
-                      <span className="px-1 py-px rounded bg-purple-900/40 border border-purple-700/40 text-[9px] font-mono text-purple-300 uppercase">LST</span>
-                    )}
-                  </div>
-                  <div className={`text-[10px] font-mono uppercase tracking-wider ${CHAIN_COLORS[h.chain] ?? 'text-ink-400'}`}>{h.chain}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-mono">{formatTokenAmount(h.amount)}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* === Asset trust & holdings (Phase 4) ============================
+           Three sections: Trusted / Low Confidence / Hidden Spam.
+           Each token reveals its plain-English verdict + reasons on click. */}
+      {(trustedHoldings.length + uncertainHoldings.length + spamHoldings.length) > 0 && (
+        <div className="mb-5">
+          <SectionLabel>
+            {t.assetTrustTitle}
+            <span className="text-ink-500 font-normal text-[10px] ml-1.5 normal-case tracking-normal">
+              {t.assetTrustHint}
+            </span>
+          </SectionLabel>
 
-      {spamHoldings.length > 0 && (
-        <details className="mb-4 rounded-lg border border-amber-700/30 bg-amber-950/20">
-          <summary className="cursor-pointer px-3 py-2 text-[11px] font-mono text-amber-300/80 hover:text-amber-200">
-            {t.spamHoldings.replace('{n}', spamHoldings.length.toString())}
-          </summary>
-          <div className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            {spamHoldings.map((h, i) => (
-              <div key={`spam-${h.chain}-${h.contract}-${i}`} className="text-[11px] font-mono text-ink-400">
-                <span className={`uppercase tracking-wider ${CHAIN_COLORS[h.chain] ?? 'text-ink-500'}`}>{h.chain}</span>
-                {' · '}
-                <span className="text-amber-300/70">{h.symbol || '???'}</span>
-                {' '}
-                <span className="text-ink-500">{formatTokenAmount(h.amount)}</span>
+          {/* Trust headline — one-line investigator verdict */}
+          {trustSummary?.headline && (
+            <div className="mb-3 px-3 py-2 rounded-lg bg-ink-800/40 border border-ruby-900/30 text-[12px] text-ink-200 leading-relaxed italic">
+              {trustSummary.headline}
+            </div>
+          )}
+
+          {/* Trusted Assets — verified blue chips, real economic value */}
+          {trustedHoldings.length > 0 && (
+            <div className="mb-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-emerald-400">
+                  {t.trustedAssets}
+                </span>
+                <span className="text-[10px] font-mono text-ink-500">
+                  {trustedHoldings.length}
+                </span>
               </div>
-            ))}
-          </div>
-        </details>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {trustedHoldings.map((h, i) => (
+                  <HoldingCard key={`tr-${h.chain}-${h.contract}-${i}`} h={h} tier="trusted" />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Low Confidence — uncertain, value cannot be confirmed */}
+          {uncertainHoldings.length > 0 && (
+            <div className="mb-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-amber-300">
+                  {t.uncertainAssets}
+                </span>
+                <span className="text-[10px] font-mono text-ink-500">
+                  {uncertainHoldings.length}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {uncertainHoldings.map((h, i) => (
+                  <HoldingCard key={`un-${h.chain}-${h.contract}-${i}`} h={h} tier="uncertain" />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Hidden Spam — collapsed by default */}
+          {spamHoldings.length > 0 && (
+            <details className="rounded-lg border border-ink-700/40 bg-ink-900/30">
+              <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-mono text-ink-400 hover:text-ink-200 transition-colors flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-ink-500" />
+                <span className="uppercase tracking-[0.18em]">{t.spamAssets}</span>
+                <span className="text-ink-500">{spamHoldings.length}</span>
+                <span className="text-ink-600 ml-auto text-[10px] normal-case">
+                  {t.spamHint}
+                </span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {spamHoldings.map((h, i) => (
+                  <div
+                    key={`sp-${h.chain}-${h.contract}-${i}`}
+                    className="text-[11px] font-mono text-ink-500 truncate"
+                    title={h.trust_summary || `${h.symbol} on ${h.chain}`}
+                  >
+                    <span className={`uppercase tracking-wider ${CHAIN_COLORS[h.chain] ?? 'text-ink-600'}`}>
+                      {h.chain}
+                    </span>
+                    {' · '}
+                    <span className="text-ink-400">{h.symbol || '???'}</span>
+                    {' '}
+                    <span className="text-ink-600">{formatTokenAmount(h.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
       )}
 
       {Object.keys(digest.activity_categories).length > 0 && (
